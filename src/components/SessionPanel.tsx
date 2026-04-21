@@ -128,6 +128,3 @@ export function SessionPanel({ joinCode, sessionId, players, onPlayersChange }: 
     </div>
   );
 }
-
-
-export { SessionPanel }
