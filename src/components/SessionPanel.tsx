@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { Users, Copy, Check } from 'lucide-react';
 import { supabase, Player } from '../lib/supabase';
 
-const FONT_TITLE = "'Jacquard 12', serif";
-const FONT_BODY = "'Germania One', serif";
+const FONT = "'Germania One', serif";
 
 interface SessionPanelProps {
   joinCode: string;
@@ -55,42 +54,41 @@ export function SessionPanel({ joinCode, sessionId, players, onPlayersChange }: 
     <div className="flex flex-col gap-3 w-full max-w-5xl">
       {/* Join code bar */}
       <div className="flex items-center justify-between px-4 py-2.5 border border-stone-800 bg-stone-950">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span
+            className="text-stone-300 tracking-wide"
+            style={{ fontFamily: FONT, fontSize: '14px' }}
+          >
+            Join at <span className="text-amber-400">{window.location.host}/join</span>
+          </span>
+          <span className="text-stone-700">·</span>
+          <span
+            className="text-stone-300 tracking-wide"
+            style={{ fontFamily: FONT, fontSize: '14px' }}
+          >
+            Code:
+          </span>
+          <button
+            onClick={copyCode}
+            className="flex items-center gap-1.5 group"
+            title="Copy join code"
+          >
             <span
-              className="text-stone-600 tracking-widest uppercase"
-              style={{ fontFamily: FONT_BODY, fontSize: '11px' }}
+              className="text-amber-400 tracking-widest font-bold"
+              style={{ fontFamily: FONT, fontSize: '18px' }}
             >
-              Join at this page ·
+              {joinCode}
             </span>
-            <span
-              className="text-stone-500 tracking-widest uppercase"
-              style={{ fontFamily: FONT_BODY, fontSize: '11px' }}
-            >
-              Code:
-            </span>
-            <button
-              onClick={copyCode}
-              className="flex items-center gap-1.5 group"
-              title="Copy join code"
-            >
-              <span
-                className="text-amber-500 tracking-widest"
-                style={{ fontFamily: FONT_TITLE, fontSize: '20px' }}
-              >
-                {joinCode}
-              </span>
-              {copied
-                ? <Check size={12} className="text-amber-500" />
-                : <Copy size={12} className="text-stone-700 group-hover:text-stone-500 transition-colors" />
-              }
-            </button>
-          </div>
+            {copied
+              ? <Check size={13} className="text-amber-400" />
+              : <Copy size={13} className="text-stone-500 group-hover:text-stone-300 transition-colors" />
+            }
+          </button>
         </div>
 
-        <div className="flex items-center gap-2 text-stone-600">
-          <Users size={12} />
-          <span style={{ fontFamily: FONT_BODY, fontSize: '12px' }}>
+        <div className="flex items-center gap-2 text-stone-400">
+          <Users size={13} />
+          <span style={{ fontFamily: FONT, fontSize: '13px' }}>
             {players.length} player{players.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -107,7 +105,7 @@ export function SessionPanel({ joinCode, sessionId, players, onPlayersChange }: 
             >
               <span
                 style={{
-                  fontFamily: FONT_BODY,
+                  fontFamily: FONT,
                   fontSize: '12px',
                   color: i === 0 && p.score > 0 ? '#d4a843' : '#78716c',
                 }}
@@ -116,7 +114,7 @@ export function SessionPanel({ joinCode, sessionId, players, onPlayersChange }: 
               </span>
               <span
                 style={{
-                  fontFamily: FONT_TITLE,
+                  fontFamily: FONT,
                   fontSize: '16px',
                   color: i === 0 && p.score > 0 ? '#d4a843' : '#57534e',
                 }}
@@ -130,3 +128,6 @@ export function SessionPanel({ joinCode, sessionId, players, onPlayersChange }: 
     </div>
   );
 }
+
+
+export { SessionPanel }
