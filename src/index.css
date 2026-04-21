@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Jacquard+12&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: #0a0908;
+  color: #c8b89a;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0908;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3a3530;
+  border-radius: 3px;
+}
+
+textarea::placeholder,
+input::placeholder {
+  color: #3a3530;
+}

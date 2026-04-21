@@ -1,0 +1,62 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export interface Board {
+  id: string;
+  title: string;
+  created_at: string;
+}
+
+export interface Category {
+  id: string;
+  board_id: string;
+  name: string;
+  display_order: number;
+  created_at: string;
+}
+
+export interface Question {
+  id: string;
+  category_id: string;
+  point_value: number;
+  question_text: string;
+  answer_text: string;
+  is_answered: boolean;
+  is_daily_double: boolean;
+  image_url: string | null;
+  created_at: string;
+}
+
+export interface GameSession {
+  id: string;
+  board_id: string;
+  join_code: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Player {
+  id: string;
+  session_id: string;
+  name: string;
+  score: number;
+  device_token: string;
+  created_at: string;
+}
+
+export function generateJoinCode(): string {
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digits = '0123456789';
+  let code = '';
+  for (let i = 0; i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
+  for (let i = 0; i < 4; i++) code += digits[Math.floor(Math.random() * digits.length)];
+  return code;
+}
+
+export function generateDeviceToken(): string {
+  return crypto.randomUUID();
+}
