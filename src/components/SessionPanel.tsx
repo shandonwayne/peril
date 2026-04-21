@@ -59,7 +59,7 @@ export function SessionPanel({ joinCode, sessionId, players, onPlayersChange }: 
             className="text-stone-300 tracking-wide"
             style={{ fontFamily: FONT, fontSize: '14px' }}
           >
-            Join at <span className="text-amber-400">{window.location.host}/join</span>
+            Join at <span className="text-amber-400">game.shandoncardosa.com/join</span>
           </span>
           <span className="text-stone-700">·</span>
           <span
