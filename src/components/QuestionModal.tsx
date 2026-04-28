@@ -75,11 +75,8 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
   const handleCorrect = async (ev: BuzzerEvent) => {
     if (adjudicating) return;
     setAdjudicating(true);
-    const p = players.find(pl => pl.id === ev.player_id);
-    if (p) {
-      await supabase.from('players').update({ score: p.score + question.point_value }).eq('id', p.id);
-      setAwardedTo(p.id);
-    }
+    await supabase.rpc('increment_player_score', { player_id: ev.player_id, delta: question.point_value });
+    setAwardedTo(ev.player_id);
     await supabase.from('buzzer_events').update({ status: 'correct' }).eq('id', ev.id);
     setBuzzerEvents(prev => prev.map(e => e.id === ev.id ? { ...e, status: 'correct' } : e));
     await clearBuzzer();
@@ -89,10 +86,7 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
   const handleIncorrect = async (ev: BuzzerEvent) => {
     if (adjudicating) return;
     setAdjudicating(true);
-    const p = players.find(pl => pl.id === ev.player_id);
-    if (p) {
-      await supabase.from('players').update({ score: p.score - question.point_value }).eq('id', p.id);
-    }
+    await supabase.rpc('increment_player_score', { player_id: ev.player_id, delta: -question.point_value });
     await supabase.from('buzzer_events').update({ status: 'incorrect' }).eq('id', ev.id);
     setBuzzerEvents(prev => prev.map(e => e.id === ev.id ? { ...e, status: 'incorrect' } : e));
     setAdjudicating(false);
@@ -307,7 +301,7 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
                       key={p.id}
                       onClick={async () => {
                         setAwardedTo(p.id);
-                        await supabase.from('players').update({ score: p.score + question.point_value }).eq('id', p.id);
+                        await supabase.rpc('increment_player_score', { player_id: p.id, delta: question.point_value });
                       }}
                       disabled={!!awardedTo}
                       className="flex items-center gap-1.5 px-4 py-2 border transition-all duration-200 disabled:cursor-default"
