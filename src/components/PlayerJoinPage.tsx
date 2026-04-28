@@ -22,12 +22,12 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
   const prevScore = useRef(initialPlayer.score);
 
   // Buzzer state
-  const [buzzerOpen, setBuzzerOpen] = useState(false);
+  const [buzzerActive, setBuzzerActive] = useState(false);
   const [buzzerQuestionId, setBuzzerQuestionId] = useState<string | null>(null);
   const [hasBuzzed, setHasBuzzed] = useState(false);
   const [buzzerResult, setBuzzerResult] = useState<'correct' | 'incorrect' | null>(null);
   const [buzzing, setBuzzing] = useState(false);
-  const buzzerOpenRef = useRef(false);
+  const buzzerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const loadPlayers = async () => {
@@ -45,13 +45,11 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
     const loadSession = async () => {
       const { data } = await supabase
         .from('game_sessions')
-        .select('buzzer_open, buzzer_question_id')
+        .select('buzzer_question_id')
         .eq('id', sessionId)
         .maybeSingle();
-      if (data) {
-        setBuzzerOpen(data.buzzer_open ?? false);
-        setBuzzerQuestionId(data.buzzer_question_id ?? null);
-        buzzerOpenRef.current = data.buzzer_open ?? false;
+      if (data?.buzzer_question_id) {
+        setBuzzerQuestionId(data.buzzer_question_id);
       }
     };
 
@@ -90,7 +88,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
       })
       .subscribe();
 
-    // Subscribe to session buzzer state changes
+    // Subscribe to session buzzer_question_id changes
     const sessionChannel = supabase
       .channel(`session_buzzer_${sessionId}`)
       .on('postgres_changes', {
@@ -100,25 +98,22 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
         filter: `id=eq.${sessionId}`,
       }, (payload) => {
         const updated = payload.new as GameSession;
-        const wasOpen = buzzerOpenRef.current;
-        const isNowOpen = updated.buzzer_open ?? false;
-
-        setBuzzerOpen(isNowOpen);
-        setBuzzerQuestionId(updated.buzzer_question_id ?? null);
-        buzzerOpenRef.current = isNowOpen;
-
-        // Reset buzzer state when a new round opens
-        if (isNowOpen && !wasOpen) {
-          setHasBuzzed(false);
-          setBuzzerResult(null);
-        }
-        // When buzzer closes, clear result display after a beat
-        if (!isNowOpen && wasOpen) {
-          setTimeout(() => {
+        const newQid = updated.buzzer_question_id ?? null;
+        setBuzzerQuestionId(prev => {
+          if (prev !== newQid) {
+            // New question — reset buzzer state
+            setBuzzerActive(false);
             setHasBuzzed(false);
             setBuzzerResult(null);
-          }, 2000);
-        }
+            if (buzzerTimerRef.current) clearTimeout(buzzerTimerRef.current);
+
+            if (newQid) {
+              // Activate buzzer after 4 seconds
+              buzzerTimerRef.current = setTimeout(() => setBuzzerActive(true), 4000);
+            }
+          }
+          return newQid;
+        });
       })
       .subscribe();
 
@@ -142,11 +137,12 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
       supabase.removeChannel(playerChannel);
       supabase.removeChannel(sessionChannel);
       supabase.removeChannel(buzzerEventChannel);
+      if (buzzerTimerRef.current) clearTimeout(buzzerTimerRef.current);
     };
   }, [sessionId, player.id]);
 
   const handleBuzz = async () => {
-    if (!buzzerOpen || hasBuzzed || buzzing || !buzzerQuestionId) return;
+    if (!buzzerActive || hasBuzzed || buzzing || !buzzerQuestionId) return;
     setBuzzing(true);
     const { error } = await supabase.from('buzzer_events').insert({
       session_id: sessionId,
@@ -163,8 +159,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
   const rank = allPlayers.findIndex(p => p.id === player.id) + 1;
   const suffix = rank === 1 ? 'st' : rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th';
 
-  // Buzzer visual state
-  const buzzerActive = buzzerOpen && !hasBuzzed;
+  const canBuzz = buzzerActive && !hasBuzzed;
   const buzzerResultColor = buzzerResult === 'correct' ? '#6b8f5e' : buzzerResult === 'incorrect' ? '#8f3b3b' : null;
 
   return (
@@ -237,10 +232,10 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
 
         <button
           onClick={handleBuzz}
-          disabled={!buzzerActive || buzzing}
+          disabled={!canBuzz || buzzing}
           className={[
             'w-48 h-48 rounded-full border-4 flex items-center justify-center transition-all duration-300 select-none',
-            buzzerActive && !buzzerResult ? 'buzzer-btn-active' : '',
+            canBuzz && !buzzerResult ? 'buzzer-btn-active' : '',
             buzzerResult === 'correct' ? 'buzzer-btn-correct' : '',
             buzzerResult === 'incorrect' ? 'buzzer-btn-incorrect' : '',
           ].join(' ')}
@@ -248,25 +243,25 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             fontFamily: FONT_TITLE,
             fontSize: '22px',
             letterSpacing: '0.1em',
-            cursor: buzzerActive ? 'pointer' : 'default',
+            cursor: canBuzz ? 'pointer' : 'default',
             borderColor: buzzerResult
               ? buzzerResultColor!
-              : buzzerActive
+              : canBuzz
               ? '#d4a843'
               : '#2d2926',
             color: buzzerResult
               ? buzzerResultColor!
-              : buzzerActive
+              : canBuzz
               ? '#d4a843'
               : '#2d2926',
             backgroundColor: buzzerResult === 'correct'
               ? 'rgba(107,143,94,0.08)'
               : buzzerResult === 'incorrect'
               ? 'rgba(143,59,59,0.08)'
-              : buzzerActive
+              : canBuzz
               ? 'rgba(212,168,67,0.05)'
               : '#0a0908',
-            transform: buzzerActive && !hasBuzzed ? 'scale(1)' : 'scale(0.97)',
+            transform: canBuzz ? 'scale(1)' : 'scale(0.97)',
           }}
         >
           {buzzerResult === 'correct'
@@ -275,7 +270,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             ? 'Incorrect'
             : hasBuzzed
             ? 'Buzzed!'
-            : buzzerActive
+            : canBuzz
             ? 'BUZZ'
             : 'Waiting...'}
         </button>
@@ -290,9 +285,9 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             ? 'Points deducted'
             : hasBuzzed
             ? 'Waiting for host...'
-            : buzzerActive
+            : canBuzz
             ? 'Tap to buzz in!'
-            : 'Buzzer inactive'}
+            : 'Waiting...'}
         </div>
       </div>
 

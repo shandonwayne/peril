@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Check, Radio, RadioTower, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { X, Check, RadioTower, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Question, Player, BuzzerEvent, supabase } from '../lib/supabase';
 import { DSFrame } from './DSFrame';
 import { DailyDoubleAnimation } from './DailyDoubleAnimation';
@@ -19,25 +19,18 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
   const [showAnswer, setShowAnswer] = useState(false);
   const [animationDone, setAnimationDone] = useState(!question.is_daily_double);
   const [awardedTo, setAwardedTo] = useState<string | null>(null);
-
-  // Buzzer state
-  const [buzzerOpen, setBuzzerOpen] = useState(false);
   const [buzzerEvents, setBuzzerEvents] = useState<BuzzerEvent[]>([]);
   const [adjudicating, setAdjudicating] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Auto-open buzzer 4 seconds after question is shown
+  // As soon as the question is shown, register it as the active question in the session.
+  // Players will activate their buzzer 4s after seeing this question_id appear.
   useEffect(() => {
-    if (!animationDone) return;
-    const timer = setTimeout(() => {
-      setBuzzerEvents([]);
-      setBuzzerOpen(true);
-      supabase
-        .from('game_sessions')
-        .update({ buzzer_open: true, buzzer_question_id: question.id })
-        .eq('id', sessionId);
-    }, 4000);
-    return () => clearTimeout(timer);
+    if (!animationDone || !sessionId) return;
+    supabase
+      .from('game_sessions')
+      .update({ buzzer_question_id: question.id, buzzer_open: true })
+      .eq('id', sessionId);
   }, [animationDone, question.id, sessionId]);
 
   // Subscribe to buzzer events for this question while modal is open
@@ -72,18 +65,7 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
     return () => { supabase.removeChannel(channel); };
   }, [sessionId, question.id]);
 
-  const openBuzzer = async () => {
-    // Clear any previous events for this question
-    setBuzzerEvents([]);
-    setBuzzerOpen(true);
-    await supabase
-      .from('game_sessions')
-      .update({ buzzer_open: true, buzzer_question_id: question.id })
-      .eq('id', sessionId);
-  };
-
-  const closeBuzzer = async () => {
-    setBuzzerOpen(false);
+  const clearBuzzer = async () => {
     await supabase
       .from('game_sessions')
       .update({ buzzer_open: false, buzzer_question_id: null })
@@ -93,63 +75,40 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
   const handleCorrect = async (ev: BuzzerEvent) => {
     if (adjudicating) return;
     setAdjudicating(true);
-
     const p = players.find(pl => pl.id === ev.player_id);
     if (p) {
-      const newScore = p.score + question.point_value;
-      await supabase.from('players').update({ score: newScore }).eq('id', p.id);
+      await supabase.from('players').update({ score: p.score + question.point_value }).eq('id', p.id);
       setAwardedTo(p.id);
     }
-
     await supabase.from('buzzer_events').update({ status: 'correct' }).eq('id', ev.id);
     setBuzzerEvents(prev => prev.map(e => e.id === ev.id ? { ...e, status: 'correct' } : e));
-    await closeBuzzer();
+    await clearBuzzer();
     setAdjudicating(false);
   };
 
   const handleIncorrect = async (ev: BuzzerEvent) => {
     if (adjudicating) return;
     setAdjudicating(true);
-
     const p = players.find(pl => pl.id === ev.player_id);
     if (p) {
-      const newScore = p.score - question.point_value;
-      await supabase.from('players').update({ score: newScore }).eq('id', p.id);
+      await supabase.from('players').update({ score: p.score - question.point_value }).eq('id', p.id);
     }
-
     await supabase.from('buzzer_events').update({ status: 'incorrect' }).eq('id', ev.id);
     setBuzzerEvents(prev => prev.map(e => e.id === ev.id ? { ...e, status: 'incorrect' } : e));
-
-    // Re-open buzzer so remaining players can buzz
-    const remainingPending = buzzerEvents.filter(e => e.id !== ev.id && e.status === 'pending');
-    if (remainingPending.length === 0) {
-      // No one else has buzzed — keep buzzer open for late buzzers
-      await supabase
-        .from('game_sessions')
-        .update({ buzzer_open: true, buzzer_question_id: question.id })
-        .eq('id', sessionId);
-    }
     setAdjudicating(false);
   };
 
   const handleClose = async () => {
-    if (buzzerOpen) await closeBuzzer();
-    if (showAnswer) {
-      onMarkAnswered(question.id);
-    }
+    await clearBuzzer();
+    if (showAnswer) onMarkAnswered(question.id);
     onClose();
   };
 
-  const handleReveal = () => setShowAnswer(true);
+  const getPlayerName = (playerId: string) =>
+    players.find(p => p.id === playerId)?.name ?? 'Unknown';
 
-  const getPlayerName = (playerId: string) => {
-    return players.find(p => p.id === playerId)?.name ?? 'Unknown';
-  };
-
-  // Pending events are those not yet adjudicated, sorted by buzz time
   const pendingEvents = buzzerEvents.filter(e => e.status === 'pending');
   const resolvedEvents = buzzerEvents.filter(e => e.status !== 'pending');
-  // The "active" buzz is the earliest pending one
   const activeBuzz = pendingEvents[0] ?? null;
 
   if (!animationDone) {
@@ -163,10 +122,7 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
       onClick={handleClose}
     >
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes buzzSlideIn {
           from { opacity: 0; transform: translateY(-6px); }
           to { opacity: 1; transform: translateY(0); }
@@ -230,37 +186,16 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
           {question.point_value}
         </div>
 
-        {/* Buzzer control */}
+        {/* Buzzer status + queue */}
         <div className="w-full flex flex-col items-center gap-4">
-          {!buzzerOpen ? (
-            <button
-              onClick={openBuzzer}
-              className="flex items-center gap-2 px-6 py-2.5 border border-stone-700 text-stone-400 hover:border-amber-700 hover:text-amber-500 transition-all duration-200 tracking-widest"
-              style={{ fontFamily: FONT, fontSize: '15px' }}
-            >
-              <Radio size={14} />
-              Open Buzzer
-            </button>
-          ) : (
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center gap-2 tracking-widest"
-                style={{ fontFamily: FONT, fontSize: '14px', color: '#d4a843' }}
-              >
-                <RadioTower size={14} className="animate-pulse" />
-                Buzzer Open
-              </div>
-              <button
-                onClick={closeBuzzer}
-                className="text-stone-600 hover:text-stone-400 transition-colors"
-                style={{ fontFamily: FONT, fontSize: '13px' }}
-              >
-                close
-              </button>
-            </div>
-          )}
+          <div
+            className="flex items-center gap-2 tracking-widest"
+            style={{ fontFamily: FONT, fontSize: '14px', color: '#d4a843' }}
+          >
+            <RadioTower size={14} className="animate-pulse" />
+            Buzzer Active
+          </div>
 
-          {/* Buzz queue */}
           {buzzerEvents.length > 0 && (
             <div className="w-full flex flex-col gap-2">
               <div
@@ -270,25 +205,14 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
                 Buzz Order
               </div>
 
-              {/* Active buzz — first pending */}
               {activeBuzz && (
                 <div
                   className="buzz-item flex items-center justify-between px-5 py-3 border"
-                  style={{
-                    borderColor: 'rgba(212,168,67,0.4)',
-                    backgroundColor: 'rgba(212,168,67,0.06)',
-                  }}
+                  style={{ borderColor: 'rgba(212,168,67,0.4)', backgroundColor: 'rgba(212,168,67,0.06)' }}
                 >
                   <div className="flex items-center gap-3">
-                    <span
-                      className="w-4 text-right"
-                      style={{ fontFamily: FONT, fontSize: '13px', color: '#d4a843' }}
-                    >
-                      1
-                    </span>
-                    <span
-                      style={{ fontFamily: FONT, fontSize: '18px', color: '#e8d5a8' }}
-                    >
+                    <span style={{ fontFamily: FONT, fontSize: '13px', color: '#d4a843' }}>1</span>
+                    <span style={{ fontFamily: FONT, fontSize: '18px', color: '#e8d5a8' }}>
                       {getPlayerName(activeBuzz.player_id)}
                     </span>
                   </div>
@@ -315,45 +239,32 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
                 </div>
               )}
 
-              {/* Remaining pending buzzes */}
               {pendingEvents.slice(1).map((ev, i) => (
                 <div
                   key={ev.id}
                   className="buzz-item flex items-center gap-3 px-5 py-2 border border-stone-900"
                   style={{ backgroundColor: '#0d0c0b' }}
                 >
-                  <span
-                    className="w-4 text-right"
-                    style={{ fontFamily: FONT, fontSize: '13px', color: '#57534e' }}
-                  >
-                    {i + 2}
-                  </span>
-                  <span
-                    style={{ fontFamily: FONT, fontSize: '16px', color: '#78716c' }}
-                  >
+                  <span style={{ fontFamily: FONT, fontSize: '13px', color: '#57534e' }}>{i + 2}</span>
+                  <span style={{ fontFamily: FONT, fontSize: '16px', color: '#78716c' }}>
                     {getPlayerName(ev.player_id)}
                   </span>
                 </div>
               ))}
 
-              {/* Resolved buzzes */}
               {resolvedEvents.map((ev) => (
                 <div
                   key={ev.id}
                   className="buzz-item flex items-center justify-between px-5 py-2 border border-stone-900 opacity-50"
                 >
-                  <span
-                    style={{ fontFamily: FONT, fontSize: '15px', color: '#57534e' }}
-                  >
+                  <span style={{ fontFamily: FONT, fontSize: '15px', color: '#57534e' }}>
                     {getPlayerName(ev.player_id)}
                   </span>
-                  <span
-                    style={{
-                      fontFamily: FONT,
-                      fontSize: '13px',
-                      color: ev.status === 'correct' ? '#6b8f5e' : '#8f3b3b',
-                    }}
-                  >
+                  <span style={{
+                    fontFamily: FONT,
+                    fontSize: '13px',
+                    color: ev.status === 'correct' ? '#6b8f5e' : '#8f3b3b',
+                  }}>
                     {ev.status}
                   </span>
                 </div>
@@ -362,10 +273,10 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
           )}
         </div>
 
-        {/* Reveal / Answer section */}
+        {/* Reveal / Answer */}
         {!showAnswer ? (
           <button
-            onClick={handleReveal}
+            onClick={() => setShowAnswer(true)}
             className="px-8 py-3 border border-amber-800 text-amber-600 hover:text-amber-300 hover:border-amber-500 transition-all duration-200 tracking-widest"
             style={{ fontFamily: FONT, fontSize: '19px' }}
           >
@@ -381,7 +292,7 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
               {question.answer_text || <span className="text-stone-600 italic">No answer set</span>}
             </div>
 
-            {/* Manual award points panel (fallback when not using buzzer) */}
+            {/* Manual award panel — fallback if buzzer wasn't used */}
             {players.length > 0 && !awardedTo && buzzerEvents.filter(e => e.status === 'correct').length === 0 && (
               <div className="flex flex-col items-center gap-3 w-full">
                 <div
@@ -396,8 +307,7 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
                       key={p.id}
                       onClick={async () => {
                         setAwardedTo(p.id);
-                        const newScore = p.score + question.point_value;
-                        await supabase.from('players').update({ score: newScore }).eq('id', p.id);
+                        await supabase.from('players').update({ score: p.score + question.point_value }).eq('id', p.id);
                       }}
                       disabled={!!awardedTo}
                       className="flex items-center gap-1.5 px-4 py-2 border transition-all duration-200 disabled:cursor-default"
@@ -418,10 +328,7 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
             )}
 
             {(awardedTo || buzzerEvents.find(e => e.status === 'correct')) && (
-              <div
-                className="text-stone-600"
-                style={{ fontFamily: FONT, fontSize: '12px' }}
-              >
+              <div className="text-stone-600" style={{ fontFamily: FONT, fontSize: '12px' }}>
                 Points awarded
               </div>
             )}
