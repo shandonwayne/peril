@@ -26,6 +26,20 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
   const [adjudicating, setAdjudicating] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
+  // Auto-open buzzer 4 seconds after question is shown
+  useEffect(() => {
+    if (!animationDone) return;
+    const timer = setTimeout(() => {
+      setBuzzerEvents([]);
+      setBuzzerOpen(true);
+      supabase
+        .from('game_sessions')
+        .update({ buzzer_open: true, buzzer_question_id: question.id })
+        .eq('id', sessionId);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [animationDone, question.id, sessionId]);
+
   // Subscribe to buzzer events for this question while modal is open
   useEffect(() => {
     const channel = supabase
