@@ -36,7 +36,18 @@ export interface GameSession {
   board_id: string;
   join_code: string;
   is_active: boolean;
+  buzzer_open: boolean;
+  buzzer_question_id: string | null;
   created_at: string;
+}
+
+export interface BuzzerEvent {
+  id: string;
+  session_id: string;
+  player_id: string;
+  question_id: string;
+  buzzed_at: string;
+  status: 'pending' | 'correct' | 'incorrect';
 }
 
 export interface Player {

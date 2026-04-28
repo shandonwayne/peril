@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { supabase, Player, GameSession, generateDeviceToken } from '../lib/supabase';
+import { supabase, Player, GameSession, BuzzerEvent, generateDeviceToken } from '../lib/supabase';
 import PerilLogo from '../assets/perillogo.svg';
 
 const FONT_TITLE = "'Jacquard 12', serif";
@@ -21,8 +21,15 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
   const [scoreFlash, setScoreFlash] = useState(false);
   const prevScore = useRef(initialPlayer.score);
 
+  // Buzzer state
+  const [buzzerOpen, setBuzzerOpen] = useState(false);
+  const [buzzerQuestionId, setBuzzerQuestionId] = useState<string | null>(null);
+  const [hasBuzzed, setHasBuzzed] = useState(false);
+  const [buzzerResult, setBuzzerResult] = useState<'correct' | 'incorrect' | null>(null);
+  const [buzzing, setBuzzing] = useState(false);
+  const buzzerOpenRef = useRef(false);
+
   useEffect(() => {
-    // Load all players in session
     const loadPlayers = async () => {
       const { data } = await supabase
         .from('players')
@@ -34,8 +41,24 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
 
     loadPlayers();
 
-    // Subscribe to real-time updates
-    const channel = supabase
+    // Load initial session state
+    const loadSession = async () => {
+      const { data } = await supabase
+        .from('game_sessions')
+        .select('buzzer_open, buzzer_question_id')
+        .eq('id', sessionId)
+        .maybeSingle();
+      if (data) {
+        setBuzzerOpen(data.buzzer_open ?? false);
+        setBuzzerQuestionId(data.buzzer_question_id ?? null);
+        buzzerOpenRef.current = data.buzzer_open ?? false;
+      }
+    };
+
+    loadSession();
+
+    // Subscribe to player score changes
+    const playerChannel = supabase
       .channel(`session_players_${sessionId}`)
       .on('postgres_changes', {
         event: '*',
@@ -67,15 +90,86 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Subscribe to session buzzer state changes
+    const sessionChannel = supabase
+      .channel(`session_buzzer_${sessionId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'game_sessions',
+        filter: `id=eq.${sessionId}`,
+      }, (payload) => {
+        const updated = payload.new as GameSession;
+        const wasOpen = buzzerOpenRef.current;
+        const isNowOpen = updated.buzzer_open ?? false;
+
+        setBuzzerOpen(isNowOpen);
+        setBuzzerQuestionId(updated.buzzer_question_id ?? null);
+        buzzerOpenRef.current = isNowOpen;
+
+        // Reset buzzer state when a new round opens
+        if (isNowOpen && !wasOpen) {
+          setHasBuzzed(false);
+          setBuzzerResult(null);
+        }
+        // When buzzer closes, clear result display after a beat
+        if (!isNowOpen && wasOpen) {
+          setTimeout(() => {
+            setHasBuzzed(false);
+            setBuzzerResult(null);
+          }, 2000);
+        }
+      })
+      .subscribe();
+
+    // Subscribe to our own buzzer event for result (correct/incorrect)
+    const buzzerEventChannel = supabase
+      .channel(`buzzer_result_${player.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'buzzer_events',
+        filter: `player_id=eq.${player.id}`,
+      }, (payload) => {
+        const ev = payload.new as BuzzerEvent;
+        if (ev.status === 'correct' || ev.status === 'incorrect') {
+          setBuzzerResult(ev.status);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(playerChannel);
+      supabase.removeChannel(sessionChannel);
+      supabase.removeChannel(buzzerEventChannel);
+    };
   }, [sessionId, player.id]);
+
+  const handleBuzz = async () => {
+    if (!buzzerOpen || hasBuzzed || buzzing || !buzzerQuestionId) return;
+    setBuzzing(true);
+    const { error } = await supabase.from('buzzer_events').insert({
+      session_id: sessionId,
+      player_id: player.id,
+      question_id: buzzerQuestionId,
+      status: 'pending',
+    });
+    if (!error) {
+      setHasBuzzed(true);
+    }
+    setBuzzing(false);
+  };
 
   const rank = allPlayers.findIndex(p => p.id === player.id) + 1;
   const suffix = rank === 1 ? 'st' : rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th';
 
+  // Buzzer visual state
+  const buzzerActive = buzzerOpen && !hasBuzzed;
+  const buzzerResultColor = buzzerResult === 'correct' ? '#6b8f5e' : buzzerResult === 'incorrect' ? '#8f3b3b' : null;
+
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-start p-6 gap-8"
+      className="min-h-screen flex flex-col items-center justify-start p-6 gap-6"
       style={{ backgroundColor: '#0a0908' }}
     >
       <img src={PerilLogo} alt="Peril" className="h-10 select-none mt-4" draggable={false} />
@@ -113,6 +207,93 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             {rank}{suffix} place
           </div>
         )}
+      </div>
+
+      {/* Buzzer section */}
+      <div className="w-full max-w-sm flex flex-col items-center gap-3">
+        <style>{`
+          @keyframes buzzer-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(212,168,67,0); }
+            50% { box-shadow: 0 0 0 16px rgba(212,168,67,0.18); }
+          }
+          @keyframes buzzer-correct {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(107,143,94,0); }
+            50% { box-shadow: 0 0 0 20px rgba(107,143,94,0.25); }
+          }
+          @keyframes buzzer-incorrect {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(143,59,59,0); }
+            50% { box-shadow: 0 0 0 20px rgba(143,59,59,0.25); }
+          }
+          .buzzer-btn-active {
+            animation: buzzer-pulse 1.6s ease-in-out infinite;
+          }
+          .buzzer-btn-correct {
+            animation: buzzer-correct 1.4s ease-in-out infinite;
+          }
+          .buzzer-btn-incorrect {
+            animation: buzzer-incorrect 1.4s ease-in-out infinite;
+          }
+        `}</style>
+
+        <button
+          onClick={handleBuzz}
+          disabled={!buzzerActive || buzzing}
+          className={[
+            'w-48 h-48 rounded-full border-4 flex items-center justify-center transition-all duration-300 select-none',
+            buzzerActive && !buzzerResult ? 'buzzer-btn-active' : '',
+            buzzerResult === 'correct' ? 'buzzer-btn-correct' : '',
+            buzzerResult === 'incorrect' ? 'buzzer-btn-incorrect' : '',
+          ].join(' ')}
+          style={{
+            fontFamily: FONT_TITLE,
+            fontSize: '22px',
+            letterSpacing: '0.1em',
+            cursor: buzzerActive ? 'pointer' : 'default',
+            borderColor: buzzerResult
+              ? buzzerResultColor!
+              : buzzerActive
+              ? '#d4a843'
+              : '#2d2926',
+            color: buzzerResult
+              ? buzzerResultColor!
+              : buzzerActive
+              ? '#d4a843'
+              : '#2d2926',
+            backgroundColor: buzzerResult === 'correct'
+              ? 'rgba(107,143,94,0.08)'
+              : buzzerResult === 'incorrect'
+              ? 'rgba(143,59,59,0.08)'
+              : buzzerActive
+              ? 'rgba(212,168,67,0.05)'
+              : '#0a0908',
+            transform: buzzerActive && !hasBuzzed ? 'scale(1)' : 'scale(0.97)',
+          }}
+        >
+          {buzzerResult === 'correct'
+            ? 'Correct!'
+            : buzzerResult === 'incorrect'
+            ? 'Incorrect'
+            : hasBuzzed
+            ? 'Buzzed!'
+            : buzzerActive
+            ? 'BUZZ'
+            : 'Waiting...'}
+        </button>
+
+        <div
+          className="text-stone-700 text-center"
+          style={{ fontFamily: FONT_BODY, fontSize: '12px' }}
+        >
+          {buzzerResult === 'correct'
+            ? 'Points awarded!'
+            : buzzerResult === 'incorrect'
+            ? 'Points deducted'
+            : hasBuzzed
+            ? 'Waiting for host...'
+            : buzzerActive
+            ? 'Tap to buzz in!'
+            : 'Buzzer inactive'}
+        </div>
       </div>
 
       {/* Leaderboard */}

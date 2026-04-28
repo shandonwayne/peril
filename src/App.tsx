@@ -211,6 +211,7 @@ function HostBoard() {
             categories={categories}
             questions={questions}
             isEditMode={isEditMode}
+            sessionId={session?.id}
             players={players}
             onMarkAnswered={handleMarkAnswered}
             onSaveQuestion={handleSaveQuestion}

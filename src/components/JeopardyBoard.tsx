@@ -13,6 +13,7 @@ interface JeopardyBoardProps {
   categories: Category[];
   questions: Question[];
   isEditMode: boolean;
+  sessionId?: string;
   players?: Player[];
   onMarkAnswered: (id: string) => void;
   onSaveQuestion: (id: string, questionText: string, answerText: string, isDailyDouble: boolean, imageUrl: string | null) => Promise<void>;
@@ -23,6 +24,7 @@ export function JeopardyBoard({
   categories,
   questions,
   isEditMode,
+  sessionId = '',
   players = [],
   onMarkAnswered,
   onSaveQuestion,
@@ -184,6 +186,7 @@ export function JeopardyBoard({
         <QuestionModal
           question={activeQuestion}
           categoryName={getCategoryForQuestion(activeQuestion)?.name ?? ''}
+          sessionId={sessionId}
           onClose={() => setActiveQuestion(null)}
           onMarkAnswered={(id) => {
             onMarkAnswered(id);
