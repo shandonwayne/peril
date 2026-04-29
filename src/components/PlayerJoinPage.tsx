@@ -7,6 +7,8 @@ const FONT_BODY = "'Germania One', serif";
 const DEVICE_TOKEN_KEY = 'peril_device_token';
 const PLAYER_ID_KEY = 'peril_player_id';
 const SESSION_ID_KEY = 'peril_session_id';
+const GAME_CODE_KEY = 'peril_game_code';
+const PLAYER_NAME_KEY = 'peril_player_name';
 
 type Phase = 'join' | 'tracker';
 
@@ -421,42 +423,22 @@ export function PlayerJoinPage() {
   const [phase, setPhase] = useState<Phase>('join');
   const [codeInput, setCodeInput] = useState('');
   const [nameInput, setNameInput] = useState('');
+  const [storedCode, setStoredCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [joinedPlayer, setJoinedPlayer] = useState<Player | null>(null);
   const [joinedSessionId, setJoinedSessionId] = useState<string>('');
 
-  // Try to reconnect from localStorage
+  // Pre-fill from localStorage but never auto-advance to tracker
   useEffect(() => {
-    const token = localStorage.getItem(DEVICE_TOKEN_KEY);
-    const playerId = localStorage.getItem(PLAYER_ID_KEY);
-    const sessionId = localStorage.getItem(SESSION_ID_KEY);
-    if (!token || !playerId || !sessionId) return;
-
-    (async () => {
-      const { data: player } = await supabase
-        .from('players')
-        .select('*')
-        .eq('id', playerId)
-        .eq('device_token', token)
-        .maybeSingle();
-
-      if (!player) return;
-
-      const { data: session } = await supabase
-        .from('game_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (!session) return;
-
-      setJoinedPlayer(player);
-      setJoinedSessionId(sessionId);
-      setPhase('tracker');
-    })();
+    const saved_code = localStorage.getItem(GAME_CODE_KEY) ?? '';
+    const saved_name = localStorage.getItem(PLAYER_NAME_KEY) ?? '';
+    if (saved_code) setCodeInput(saved_code);
+    if (saved_name) setNameInput(saved_name);
+    setStoredCode(saved_code);
   }, []);
+
+  const isRejoining = codeInput.trim().toUpperCase() === storedCode;
 
   const handleJoin = async () => {
     setError('');
@@ -469,6 +451,39 @@ export function PlayerJoinPage() {
 
     setLoading(true);
 
+    // Attempt rejoin: reuse existing player row when returning to the same game
+    if (isRejoining) {
+      const token = localStorage.getItem(DEVICE_TOKEN_KEY);
+      const playerId = localStorage.getItem(PLAYER_ID_KEY);
+      const sessionId = localStorage.getItem(SESSION_ID_KEY);
+
+      if (token && playerId && sessionId) {
+        const { data: player } = await supabase
+          .from('players')
+          .select('*')
+          .eq('id', playerId)
+          .eq('device_token', token)
+          .maybeSingle();
+
+        const { data: session } = await supabase
+          .from('game_sessions')
+          .select('*')
+          .eq('id', sessionId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (player && session) {
+          setJoinedPlayer(player);
+          setJoinedSessionId(sessionId);
+          setPhase('tracker');
+          setLoading(false);
+          return;
+        }
+      }
+      // Fall through to fresh join if stored records are gone
+    }
+
+    // Fresh join: look up the session by code and create a new player row
     const { data: session } = await supabase
       .from('game_sessions')
       .select('*')
@@ -498,6 +513,9 @@ export function PlayerJoinPage() {
     localStorage.setItem(DEVICE_TOKEN_KEY, deviceToken);
     localStorage.setItem(PLAYER_ID_KEY, player.id);
     localStorage.setItem(SESSION_ID_KEY, session.id);
+    localStorage.setItem(GAME_CODE_KEY, code);
+    localStorage.setItem(PLAYER_NAME_KEY, name);
+    setStoredCode(code);
 
     setJoinedPlayer(player);
     setJoinedSessionId(session.id);
@@ -508,6 +526,10 @@ export function PlayerJoinPage() {
   if (phase === 'tracker' && joinedPlayer && joinedSessionId) {
     return <PlayerTracker player={joinedPlayer} sessionId={joinedSessionId} />;
   }
+
+  const ctaLabel = loading
+    ? (isRejoining ? 'Rejoining...' : 'Joining...')
+    : (isRejoining ? 'Rejoin' : 'Join');
 
   return (
     <div
@@ -537,7 +559,7 @@ export function PlayerJoinPage() {
             </label>
             <input
               value={codeInput}
-              onChange={e => setCodeInput(e.target.value.toUpperCase())}
+              onChange={e => { setCodeInput(e.target.value.toUpperCase()); setError(''); }}
               onKeyDown={e => e.key === 'Enter' && handleJoin()}
               placeholder="ABCD1234"
               maxLength={8}
@@ -555,7 +577,7 @@ export function PlayerJoinPage() {
             </label>
             <input
               value={nameInput}
-              onChange={e => setNameInput(e.target.value)}
+              onChange={e => { setNameInput(e.target.value); setError(''); }}
               onKeyDown={e => e.key === 'Enter' && handleJoin()}
               placeholder="Enter name"
               maxLength={20}
@@ -580,7 +602,7 @@ export function PlayerJoinPage() {
           className="w-full py-3 border border-amber-800 text-amber-600 hover:text-amber-300 hover:border-amber-500 transition-all duration-200 tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ fontFamily: FONT_BODY, fontSize: '16px' }}
         >
-          {loading ? 'Joining...' : 'Join'}
+          {ctaLabel}
         </button>
       </div>
     </div>
