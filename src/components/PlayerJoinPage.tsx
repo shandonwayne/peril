@@ -446,13 +446,6 @@ export function PlayerJoinPage() {
   const [loading, setLoading] = useState(false);
   const [joinedPlayer, setJoinedPlayer] = useState<Player | null>(null);
   const [joinedSessionId, setJoinedSessionId] = useState<string>('');
-  const codeRef0 = useRef<HTMLInputElement>(null);
-  const codeRef1 = useRef<HTMLInputElement>(null);
-  const codeRef2 = useRef<HTMLInputElement>(null);
-  const codeRef3 = useRef<HTMLInputElement>(null);
-  const codeRef4 = useRef<HTMLInputElement>(null);
-  const codeRef5 = useRef<HTMLInputElement>(null);
-  const codeRefs = [codeRef0, codeRef1, codeRef2, codeRef3, codeRef4, codeRef5];
 
   // Pre-fill from localStorage but never auto-advance to tracker
   useEffect(() => {
@@ -598,45 +591,6 @@ export function PlayerJoinPage() {
     ? (isRejoining ? 'Rejoining...' : 'Joining...')
     : (isRejoining ? 'Rejoin' : 'Join');
 
-  const codeChars = codeInput.padEnd(6, '').split('').slice(0, 6);
-
-  const handleCodeBoxChange = (i: number, val: string) => {
-    const ch = val.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(-1);
-    const next = codeChars.map((c, idx) => idx === i ? ch : c).join('').trimEnd();
-    setCodeInput(next);
-    setError('');
-    if (ch && i < 5) codeRefs[i + 1].current?.focus();
-  };
-
-  const handleCodeBoxKeyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace') {
-      if (codeChars[i]) {
-        const next = codeChars.map((c, idx) => idx === i ? '' : c).join('').trimEnd();
-        setCodeInput(next);
-      } else if (i > 0) {
-        codeRefs[i - 1].current?.focus();
-        const next = codeChars.map((c, idx) => idx === i - 1 ? '' : c).join('').trimEnd();
-        setCodeInput(next);
-      }
-      e.preventDefault();
-    } else if (e.key === 'Enter') {
-      handleJoin();
-    } else if (e.key === 'ArrowLeft' && i > 0) {
-      codeRefs[i - 1].current?.focus();
-    } else if (e.key === 'ArrowRight' && i < 5) {
-      codeRefs[i + 1].current?.focus();
-    }
-  };
-
-  const handleCodeBoxPaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData('text').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6);
-    setCodeInput(pasted);
-    setError('');
-    const focusIdx = Math.min(pasted.length, 5);
-    codeRefs[focusIdx].current?.focus();
-    e.preventDefault();
-  };
-
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center p-6 gap-8"
@@ -648,39 +602,33 @@ export function PlayerJoinPage() {
         className="w-full max-w-sm flex flex-col gap-6 p-8 border border-stone-800"
         style={{ backgroundColor: '#111009' }}
       >
+        <div
+          className="text-stone-400 tracking-widest text-center"
+          style={{ fontFamily: FONT_TITLE, fontSize: '22px' }}
+        >
+          Join Game
+        </div>
+
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <label
               className="text-stone-600 tracking-widest uppercase"
               style={{ fontFamily: FONT_BODY, fontSize: '11px' }}
             >
               Game Code
             </label>
-            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-              {codeChars.map((ch, i) => (
-                <input
-                  key={i}
-                  ref={codeRefs[i]}
-                  value={ch}
-                  onChange={e => handleCodeBoxChange(i, e.target.value)}
-                  onKeyDown={e => handleCodeBoxKeyDown(i, e)}
-                  onPaste={handleCodeBoxPaste}
-                  onFocus={e => e.target.select()}
-                  maxLength={1}
-                  autoFocus={i === 0}
-                  className="bg-transparent border border-stone-800 text-stone-300 focus:outline-none focus:border-stone-500 transition-colors text-center"
-                  style={{
-                    fontFamily: FONT_BODY,
-                    fontSize: '28px',
-                    letterSpacing: '0.05em',
-                    height: '64px',
-                  }}
-                />
-              ))}
-            </div>
+            <input
+              value={codeInput}
+              onChange={e => { setCodeInput(e.target.value.toUpperCase()); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleJoin()}
+              placeholder="ABCD1234"
+              maxLength={8}
+              className="bg-transparent border border-stone-800 text-stone-300 px-3 py-2.5 focus:outline-none focus:border-stone-600 transition-colors tracking-widest text-center"
+              style={{ fontFamily: FONT_BODY, fontSize: '22px' }}
+            />
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <label
               className="text-stone-600 tracking-widest uppercase"
               style={{ fontFamily: FONT_BODY, fontSize: '11px' }}
@@ -693,12 +641,12 @@ export function PlayerJoinPage() {
               onKeyDown={e => e.key === 'Enter' && handleJoin()}
               placeholder="Enter name"
               maxLength={20}
-              className="bg-transparent border border-stone-800 text-stone-300 px-3 focus:outline-none focus:border-stone-500 transition-colors"
-              style={{ fontFamily: FONT_BODY, fontSize: '22px', height: '64px' }}
+              className="bg-transparent border border-stone-800 text-stone-300 px-3 py-2.5 focus:outline-none focus:border-stone-600 transition-colors"
+              style={{ fontFamily: FONT_BODY, fontSize: '16px' }}
             />
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <label
               className="text-stone-600 tracking-widest uppercase"
               style={{ fontFamily: FONT_BODY, fontSize: '11px' }}
