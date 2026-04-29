@@ -431,14 +431,52 @@ export function PlayerJoinPage() {
 
   // Pre-fill from localStorage but never auto-advance to tracker
   useEffect(() => {
-    const saved_code = localStorage.getItem(GAME_CODE_KEY) ?? '';
-    const saved_name = localStorage.getItem(PLAYER_NAME_KEY) ?? '';
-    if (saved_code) setCodeInput(saved_code);
-    if (saved_name) setNameInput(saved_name);
-    setStoredCode(saved_code);
+    (async () => {
+      let savedCode = localStorage.getItem(GAME_CODE_KEY) ?? '';
+      const savedName = localStorage.getItem(PLAYER_NAME_KEY) ?? '';
+
+      // Migrate: if no GAME_CODE_KEY but we have a session, look up the join code
+      if (!savedCode) {
+        const sessionId = localStorage.getItem(SESSION_ID_KEY);
+        if (sessionId) {
+          const { data: session } = await supabase
+            .from('game_sessions')
+            .select('join_code')
+            .eq('id', sessionId)
+            .maybeSingle();
+          if (session?.join_code) {
+            savedCode = session.join_code;
+            localStorage.setItem(GAME_CODE_KEY, savedCode);
+          }
+        }
+      }
+
+      // Migrate: if no PLAYER_NAME_KEY but we have a player id, look up the name
+      let resolvedName = savedName;
+      if (!resolvedName) {
+        const playerId = localStorage.getItem(PLAYER_ID_KEY);
+        const token = localStorage.getItem(DEVICE_TOKEN_KEY);
+        if (playerId && token) {
+          const { data: player } = await supabase
+            .from('players')
+            .select('name')
+            .eq('id', playerId)
+            .eq('device_token', token)
+            .maybeSingle();
+          if (player?.name) {
+            resolvedName = player.name;
+            localStorage.setItem(PLAYER_NAME_KEY, resolvedName);
+          }
+        }
+      }
+
+      if (savedCode) setCodeInput(savedCode);
+      if (resolvedName) setNameInput(resolvedName);
+      setStoredCode(savedCode);
+    })();
   }, []);
 
-  const isRejoining = codeInput.trim().toUpperCase() === storedCode;
+  const isRejoining = storedCode.length > 0 && codeInput.trim().toUpperCase() === storedCode;
 
   const handleJoin = async () => {
     setError('');
@@ -564,7 +602,7 @@ export function PlayerJoinPage() {
               placeholder="ABCD1234"
               maxLength={8}
               className="bg-transparent border border-stone-800 text-stone-300 px-3 py-2.5 focus:outline-none focus:border-stone-600 transition-colors tracking-widest text-center"
-              style={{ fontFamily: FONT_TITLE, fontSize: '22px' }}
+              style={{ fontFamily: FONT_BODY, fontSize: '22px' }}
             />
           </div>
 
