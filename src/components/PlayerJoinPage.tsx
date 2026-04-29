@@ -88,6 +88,18 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             if (prev.find(p => p.id === inserted.id)) return prev;
             return [...prev, inserted].sort((a, b) => b.score - a.score);
           });
+        } else if (payload.eventType === 'DELETE') {
+          const deleted = payload.old as { id: string };
+          if (deleted.id === player.id) {
+            // This player was removed by the host — clear storage and go back to join
+            localStorage.removeItem('peril_player_id');
+            localStorage.removeItem('peril_session_id');
+            localStorage.removeItem('peril_game_code');
+            localStorage.removeItem('peril_device_token');
+            window.location.reload();
+            return;
+          }
+          setAllPlayers(prev => prev.filter(p => p.id !== deleted.id));
         }
       })
       .subscribe();
