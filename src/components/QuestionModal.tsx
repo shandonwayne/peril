@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Check, RadioTower, ThumbsUp, ThumbsDown, Zap } from 'lucide-react';
+import { X, Check, ThumbsUp, ThumbsDown, Zap } from 'lucide-react';
 import { Question, Player, BuzzerEvent, supabase } from '../lib/supabase';
 import { DSFrame } from './DSFrame';
 import { DailyDoubleAnimation } from './DailyDoubleAnimation';
@@ -183,18 +183,22 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
         {/* Buzzer status + queue */}
         <div className="w-full flex flex-col items-center gap-3">
 
-          {/* First buzzer — prominent callout */}
-          {activeBuzz ? (
-            <div
-              className="buzz-item w-full flex flex-col gap-3 px-6 py-4 border"
-              style={{
-                borderColor: 'rgba(212,168,67,0.5)',
-                backgroundColor: 'rgba(212,168,67,0.07)',
-                animation: 'buzzSlideIn 0.25s ease-out both',
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+          {/* Buzz-in slot — always occupies same height, transitions between waiting and filled */}
+          <div
+            className="w-full flex items-center justify-between px-6 py-4 border transition-all duration-300"
+            style={{
+              borderColor: activeBuzz ? 'rgba(212,168,67,0.5)' : 'rgba(68,60,52,0.5)',
+              borderStyle: activeBuzz ? 'solid' : 'dashed',
+              backgroundColor: activeBuzz ? 'rgba(212,168,67,0.07)' : 'rgba(17,16,9,0.6)',
+              minHeight: '68px',
+            }}
+          >
+            {activeBuzz ? (
+              <>
+                <div
+                  className="flex items-center gap-3"
+                  style={{ animation: 'buzzSlideIn 0.2s ease-out both' }}
+                >
                   <Zap size={18} className="text-amber-400" fill="currentColor" />
                   <span style={{ fontFamily: FONT, fontSize: '26px', color: '#e8d5a8', letterSpacing: '0.04em' }}>
                     {getPlayerName(activeBuzz.player_id)}
@@ -221,17 +225,16 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
                     Incorrect
                   </button>
                 </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-3 mx-auto" style={{ opacity: 0.35 }}>
+                <Zap size={16} style={{ color: '#7B695D' }} />
+                <span style={{ fontFamily: FONT, fontSize: '15px', color: '#7B695D', letterSpacing: '0.08em' }}>
+                  Waiting for buzz...
+                </span>
               </div>
-            </div>
-          ) : (
-            <div
-              className="flex items-center gap-2 tracking-widest"
-              style={{ fontFamily: FONT, fontSize: '14px', color: '#d4a843' }}
-            >
-              <RadioTower size={14} className="animate-pulse" />
-              Buzzer Active
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Queue — subsequent buzzers */}
           {pendingEvents.slice(1).length > 0 && (
