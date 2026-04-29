@@ -272,7 +272,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             ? 'Buzzed!'
             : canBuzz
             ? 'BUZZ'
-            : 'Waiting...'}
+            : 'BUZZ'}
         </button>
 
         <div
@@ -287,7 +287,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             ? 'Waiting for host...'
             : canBuzz
             ? 'Tap to buzz in!'
-            : 'Waiting...'}
+            : ''}
         </div>
       </div>
 
