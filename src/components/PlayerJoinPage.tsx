@@ -315,7 +315,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             tooSlow ? 'buzzer-btn-tooslow' : '',
           ].join(' ')}
           style={{
-            fontFamily: FONT_TITLE,
+            fontFamily: FONT_BODY,
             fontSize: '22px',
             letterSpacing: '0.1em',
             cursor: canBuzz ? 'pointer' : 'default',
