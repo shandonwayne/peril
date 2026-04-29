@@ -36,9 +36,12 @@ function HostBoard() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [buzzedPlayerId, setBuzzedPlayerId] = useState<string | null>(null);
   const [showBoardSwitcher, setShowBoardSwitcher] = useState(false);
+  const [isFirstVisit, setIsFirstVisit] = useState(true);
 
   useEffect(() => {
-    loadBoard();
+    // Always show the welcome prompt on first visit — don't auto-load any board
+    setShowBoardSwitcher(true);
+    setLoading(false);
   }, []);
 
   const loadBoard = async (boardId?: string) => {
@@ -51,21 +54,17 @@ function HostBoard() {
 
     let b: Board | null = null;
 
-    if (boardId) {
-      const { data } = await supabase
-        .from('boards')
-        .select('*')
-        .eq('id', boardId)
-        .maybeSingle();
-      b = data;
-    } else {
-      const { data: boards } = await supabase
-        .from('boards')
-        .select('*')
-        .order('created_at', { ascending: true })
-        .limit(1);
-      b = boards?.[0] ?? null;
+    if (!boardId) {
+      setLoading(false);
+      return;
     }
+
+    const { data } = await supabase
+      .from('boards')
+      .select('*')
+      .eq('id', boardId)
+      .maybeSingle();
+    b = data;
 
     if (!b) {
       setLoading(false);
@@ -327,8 +326,8 @@ function HostBoard() {
 
       {showBoardSwitcher && (
         <BoardSwitcherModal
-          onClose={() => setShowBoardSwitcher(false)}
-          onBoardLoaded={(id) => loadBoard(id)}
+          onClose={isFirstVisit ? undefined : () => setShowBoardSwitcher(false)}
+          onBoardLoaded={(id) => { setIsFirstVisit(false); setShowBoardSwitcher(false); loadBoard(id); }}
         />
       )}
     </div>
