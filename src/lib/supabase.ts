@@ -62,11 +62,9 @@ export interface Player {
 }
 
 export function generateJoinCode(): string {
-  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const digits = '0123456789';
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
   let code = '';
-  for (let i = 0; i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
-  for (let i = 0; i < 4; i++) code += digits[Math.floor(Math.random() * digits.length)];
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
 }
 
