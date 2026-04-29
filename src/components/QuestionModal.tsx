@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Check, RadioTower, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { X, Check, RadioTower, ThumbsUp, ThumbsDown, Zap } from 'lucide-react';
 import { Question, Player, BuzzerEvent, supabase } from '../lib/supabase';
 import { DSFrame } from './DSFrame';
 import { DailyDoubleAnimation } from './DailyDoubleAnimation';
@@ -181,58 +181,67 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
         </div>
 
         {/* Buzzer status + queue */}
-        <div className="w-full flex flex-col items-center gap-4">
-          <div
-            className="flex items-center gap-2 tracking-widest"
-            style={{ fontFamily: FONT, fontSize: '14px', color: '#d4a843' }}
-          >
-            <RadioTower size={14} className="animate-pulse" />
-            Buzzer Active
-          </div>
+        <div className="w-full flex flex-col items-center gap-3">
 
-          {buzzerEvents.length > 0 && (
-            <div className="w-full flex flex-col gap-2">
+          {/* First buzzer — prominent callout */}
+          {activeBuzz ? (
+            <div
+              className="buzz-item w-full flex flex-col gap-3 px-6 py-4 border"
+              style={{
+                borderColor: 'rgba(212,168,67,0.5)',
+                backgroundColor: 'rgba(212,168,67,0.07)',
+                animation: 'buzzSlideIn 0.25s ease-out both',
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Zap size={18} className="text-amber-400" fill="currentColor" />
+                  <span style={{ fontFamily: FONT, fontSize: '26px', color: '#e8d5a8', letterSpacing: '0.04em' }}>
+                    {getPlayerName(activeBuzz.player_id)}
+                  </span>
+                  <span style={{ fontFamily: FONT, fontSize: '13px', color: '#78716c' }}>buzzed first</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleCorrect(activeBuzz)}
+                    disabled={adjudicating}
+                    className="flex items-center gap-1.5 px-4 py-1.5 border border-stone-700 text-stone-500 hover:border-green-800 hover:text-green-600 transition-all duration-200 disabled:opacity-40"
+                    style={{ fontFamily: FONT, fontSize: '13px' }}
+                  >
+                    <ThumbsUp size={12} />
+                    Correct
+                  </button>
+                  <button
+                    onClick={() => handleIncorrect(activeBuzz)}
+                    disabled={adjudicating}
+                    className="flex items-center gap-1.5 px-4 py-1.5 border border-stone-700 text-stone-500 hover:border-red-900 hover:text-red-700 transition-all duration-200 disabled:opacity-40"
+                    style={{ fontFamily: FONT, fontSize: '13px' }}
+                  >
+                    <ThumbsDown size={12} />
+                    Incorrect
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="flex items-center gap-2 tracking-widest"
+              style={{ fontFamily: FONT, fontSize: '14px', color: '#d4a843' }}
+            >
+              <RadioTower size={14} className="animate-pulse" />
+              Buzzer Active
+            </div>
+          )}
+
+          {/* Queue — subsequent buzzers */}
+          {pendingEvents.slice(1).length > 0 && (
+            <div className="w-full flex flex-col gap-1 mt-1">
               <div
                 className="text-stone-600 tracking-widest uppercase text-center"
                 style={{ fontFamily: FONT, fontSize: '11px' }}
               >
-                Buzz Order
+                Queue
               </div>
-
-              {activeBuzz && (
-                <div
-                  className="buzz-item flex items-center justify-between px-5 py-3 border"
-                  style={{ borderColor: 'rgba(212,168,67,0.4)', backgroundColor: 'rgba(212,168,67,0.06)' }}
-                >
-                  <div className="flex items-center gap-3">
-                    <span style={{ fontFamily: FONT, fontSize: '13px', color: '#d4a843' }}>1</span>
-                    <span style={{ fontFamily: FONT, fontSize: '18px', color: '#e8d5a8' }}>
-                      {getPlayerName(activeBuzz.player_id)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleCorrect(activeBuzz)}
-                      disabled={adjudicating}
-                      className="flex items-center gap-1.5 px-4 py-1.5 border border-stone-700 text-stone-500 hover:border-green-800 hover:text-green-600 transition-all duration-200 disabled:opacity-40"
-                      style={{ fontFamily: FONT, fontSize: '13px' }}
-                    >
-                      <ThumbsUp size={12} />
-                      Correct
-                    </button>
-                    <button
-                      onClick={() => handleIncorrect(activeBuzz)}
-                      disabled={adjudicating}
-                      className="flex items-center gap-1.5 px-4 py-1.5 border border-stone-700 text-stone-500 hover:border-red-900 hover:text-red-700 transition-all duration-200 disabled:opacity-40"
-                      style={{ fontFamily: FONT, fontSize: '13px' }}
-                    >
-                      <ThumbsDown size={12} />
-                      Incorrect
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {pendingEvents.slice(1).map((ev, i) => (
                 <div
                   key={ev.id}
@@ -245,7 +254,12 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
                   </span>
                 </div>
               ))}
+            </div>
+          )}
 
+          {/* Resolved */}
+          {resolvedEvents.length > 0 && (
+            <div className="w-full flex flex-col gap-1">
               {resolvedEvents.map((ev) => (
                 <div
                   key={ev.id}

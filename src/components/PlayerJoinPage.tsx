@@ -25,6 +25,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
   const [buzzerActive, setBuzzerActive] = useState(false);
   const [buzzerQuestionId, setBuzzerQuestionId] = useState<string | null>(null);
   const [hasBuzzed, setHasBuzzed] = useState(false);
+  const [wasFirst, setWasFirst] = useState<boolean | null>(null); // null = unknown, true = first, false = not first
   const [buzzerResult, setBuzzerResult] = useState<'correct' | 'incorrect' | null>(null);
   const [buzzing, setBuzzing] = useState(false);
   const buzzerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,6 +106,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             setBuzzerActive(false);
             setHasBuzzed(false);
             setBuzzerResult(null);
+            setWasFirst(null);
             if (buzzerTimerRef.current) clearTimeout(buzzerTimerRef.current);
 
             if (newQid) {
@@ -132,8 +134,44 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
           setTimeout(() => {
             setBuzzerResult(null);
             setHasBuzzed(false);
+            setWasFirst(null);
           }, 2000);
         }
+      })
+      .subscribe();
+
+    // Subscribe to ALL buzzer inserts for this session to detect if someone else buzzed first
+    const allBuzzesChannel = supabase
+      .channel(`all_buzzes_${sessionId}_${player.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'buzzer_events',
+        filter: `session_id=eq.${sessionId}`,
+      }, (payload) => {
+        const ev = payload.new as BuzzerEvent;
+        setHasBuzzed(prev => {
+          if (prev) {
+            // We already buzzed — this INSERT is either ours or someone after us
+            if (ev.player_id !== player.id) {
+              // Someone else also buzzed — we already buzzed so we're first (or equal)
+              // No change needed
+            }
+            return prev;
+          } else {
+            // We haven't buzzed yet — someone else beat us
+            if (ev.player_id !== player.id) {
+              setWasFirst(false);
+              setHasBuzzed(true);
+              if (buzzerTimerRef.current) clearTimeout(buzzerTimerRef.current);
+              buzzerTimerRef.current = setTimeout(() => {
+                setHasBuzzed(false);
+                setWasFirst(null);
+              }, 3000);
+            }
+            return prev;
+          }
+        });
       })
       .subscribe();
 
@@ -141,6 +179,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
       supabase.removeChannel(playerChannel);
       supabase.removeChannel(sessionChannel);
       supabase.removeChannel(buzzerEventChannel);
+      supabase.removeChannel(allBuzzesChannel);
       if (buzzerTimerRef.current) clearTimeout(buzzerTimerRef.current);
     };
   }, [sessionId, player.id]);
@@ -156,9 +195,11 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
     });
     if (!error) {
       setHasBuzzed(true);
+      setWasFirst(true);
       buzzerTimerRef.current = setTimeout(() => {
         setHasBuzzed(false);
         setBuzzerResult(null);
+        setWasFirst(null);
       }, 5000);
     }
     setBuzzing(false);
@@ -168,6 +209,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
   const suffix = rank === 1 ? 'st' : rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th';
 
   const canBuzz = !hasBuzzed;
+  const tooSlow = wasFirst === false;
   const buzzerResultColor = buzzerResult === 'correct' ? '#6b8f5e' : buzzerResult === 'incorrect' ? '#8f3b3b' : null;
 
   return (
@@ -227,6 +269,10 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             0%, 100% { box-shadow: 0 0 0 0 rgba(143,59,59,0); }
             50% { box-shadow: 0 0 0 20px rgba(143,59,59,0.25); }
           }
+          @keyframes buzzer-tooslow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(180,40,40,0); }
+            50% { box-shadow: 0 0 0 20px rgba(180,40,40,0.3); }
+          }
           .buzzer-btn-active {
             animation: buzzer-pulse 1.6s ease-in-out infinite;
           }
@@ -236,6 +282,9 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
           .buzzer-btn-incorrect {
             animation: buzzer-incorrect 1.4s ease-in-out infinite;
           }
+          .buzzer-btn-tooslow {
+            animation: buzzer-tooslow 1s ease-in-out infinite;
+          }
         `}</style>
 
         <button
@@ -243,9 +292,10 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
           disabled={!canBuzz || buzzing}
           className={[
             'w-48 h-48 rounded-full border-4 flex items-center justify-center transition-all duration-300 select-none',
-            canBuzz && !buzzerResult ? 'buzzer-btn-active' : '',
+            canBuzz && !buzzerResult && !tooSlow ? 'buzzer-btn-active' : '',
             buzzerResult === 'correct' ? 'buzzer-btn-correct' : '',
             buzzerResult === 'incorrect' ? 'buzzer-btn-incorrect' : '',
+            tooSlow ? 'buzzer-btn-tooslow' : '',
           ].join(' ')}
           style={{
             fontFamily: FONT_TITLE,
@@ -254,11 +304,15 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             cursor: canBuzz ? 'pointer' : 'default',
             borderColor: buzzerResult
               ? buzzerResultColor!
+              : tooSlow
+              ? '#b42828'
               : canBuzz
               ? '#d4a843'
               : '#2d2926',
             color: buzzerResult
               ? buzzerResultColor!
+              : tooSlow
+              ? '#b42828'
               : canBuzz
               ? '#d4a843'
               : '#2d2926',
@@ -266,6 +320,8 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
               ? 'rgba(107,143,94,0.08)'
               : buzzerResult === 'incorrect'
               ? 'rgba(143,59,59,0.08)'
+              : tooSlow
+              ? 'rgba(180,40,40,0.06)'
               : canBuzz
               ? 'rgba(212,168,67,0.05)'
               : '#0a0908',
@@ -276,10 +332,10 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             ? 'Correct!'
             : buzzerResult === 'incorrect'
             ? 'Incorrect'
+            : tooSlow
+            ? 'Too Slow'
             : hasBuzzed
             ? 'Buzzed!'
-            : canBuzz
-            ? 'BUZZ'
             : 'BUZZ'}
         </button>
 
@@ -291,11 +347,11 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             ? 'Points awarded!'
             : buzzerResult === 'incorrect'
             ? 'Points deducted'
+            : tooSlow
+            ? 'Someone else was faster'
             : hasBuzzed
             ? 'Waiting for host...'
-            : canBuzz
-            ? 'Tap to buzz in!'
-            : ''}
+            : 'Tap to buzz in!'}
         </div>
       </div>
 
