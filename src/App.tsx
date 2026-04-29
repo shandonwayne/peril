@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { RotateCcw, Trash2 } from 'lucide-react';
+import { RotateCcw, Trash2, FolderOpen } from 'lucide-react';
 import { supabase, Board, Category, Question, Player, GameSession, generateJoinCode } from './lib/supabase';
 import PerilLogo from './assets/perillogo.svg';
 import { JeopardyBoard } from './components/JeopardyBoard';
@@ -7,6 +7,7 @@ import { ModeToggle } from './components/ModeToggle';
 import { DSFrame } from './components/DSFrame';
 import { SessionPanel } from './components/SessionPanel';
 import { PlayerJoinPage } from './components/PlayerJoinPage';
+import { BoardSwitcherModal } from './components/BoardSwitcherModal';
 
 // Simple client-side routing: /join shows the player join page, everything else shows the host board
 function useRoute(): 'host' | 'join' {
@@ -34,26 +35,43 @@ function HostBoard() {
   const [session, setSession] = useState<GameSession | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [buzzedPlayerId, setBuzzedPlayerId] = useState<string | null>(null);
+  const [showBoardSwitcher, setShowBoardSwitcher] = useState(false);
 
   useEffect(() => {
     loadBoard();
   }, []);
 
-  const loadBoard = async () => {
+  const loadBoard = async (boardId?: string) => {
     setLoading(true);
+    setCategories([]);
+    setQuestions([]);
+    setSession(null);
+    setPlayers([]);
+    setBuzzedPlayerId(null);
 
-    const { data: boards } = await supabase
-      .from('boards')
-      .select('*')
-      .order('created_at', { ascending: true })
-      .limit(1);
+    let b: Board | null = null;
 
-    if (!boards || boards.length === 0) {
+    if (boardId) {
+      const { data } = await supabase
+        .from('boards')
+        .select('*')
+        .eq('id', boardId)
+        .maybeSingle();
+      b = data;
+    } else {
+      const { data: boards } = await supabase
+        .from('boards')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(1);
+      b = boards?.[0] ?? null;
+    }
+
+    if (!b) {
       setLoading(false);
       return;
     }
 
-    const b = boards[0];
     setBoard(b);
 
     const { data: cats } = await supabase
@@ -274,19 +292,45 @@ function HostBoard() {
           </button>
         )}
         {isEditMode && (
-          <button
-            onClick={handleClearBoard}
-            className="flex items-center gap-1.5 text-stone-600 hover:text-red-700 transition-colors duration-200 cursor-pointer bg-transparent border-none outline-none"
-            style={{ fontSize: '11px', letterSpacing: '0.05em' }}
-            title="Clear all questions and answers"
-          >
-            <Trash2 size={10} />
-            <span>clear board</span>
-          </button>
+          <>
+            {board?.board_code && (
+              <span
+                className="text-stone-700 tracking-widest select-all"
+                style={{ fontFamily: "'Jacquard 12', serif", fontSize: '13px' }}
+                title="Board code — share this to reload the board later"
+              >
+                {board.board_code}
+              </span>
+            )}
+            <button
+              onClick={() => setShowBoardSwitcher(true)}
+              className="flex items-center gap-1.5 text-stone-600 hover:text-stone-400 transition-colors duration-200 cursor-pointer bg-transparent border-none outline-none"
+              style={{ fontSize: '11px', letterSpacing: '0.05em' }}
+              title="Load or create a board"
+            >
+              <FolderOpen size={10} />
+              <span>boards</span>
+            </button>
+            <button
+              onClick={handleClearBoard}
+              className="flex items-center gap-1.5 text-stone-600 hover:text-red-700 transition-colors duration-200 cursor-pointer bg-transparent border-none outline-none"
+              style={{ fontSize: '11px', letterSpacing: '0.05em' }}
+              title="Clear all questions and answers"
+            >
+              <Trash2 size={10} />
+              <span>clear board</span>
+            </button>
+          </>
         )}
         <ModeToggle isEditMode={isEditMode} onToggle={() => setIsEditMode(e => !e)} />
       </div>
 
+      {showBoardSwitcher && (
+        <BoardSwitcherModal
+          onClose={() => setShowBoardSwitcher(false)}
+          onBoardLoaded={(id) => loadBoard(id)}
+        />
+      )}
     </div>
   );
 }

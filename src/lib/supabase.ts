@@ -8,6 +8,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export interface Board {
   id: string;
   title: string;
+  board_code: string;
   created_at: string;
 }
 
@@ -65,6 +66,13 @@ export function generateJoinCode(): string {
   let code = '';
   for (let i = 0; i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
   for (let i = 0; i < 4; i++) code += digits[Math.floor(Math.random() * digits.length)];
+  return code;
+}
+
+export function generateBoardCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
 }
 
