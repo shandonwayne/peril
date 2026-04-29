@@ -223,7 +223,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
 
       {/* Player score card */}
       <div
-        className="w-full max-w-sm flex flex-col items-center gap-2 py-8 px-6 border border-stone-800"
+        className="w-full max-w-sm flex flex-col items-center gap-1 py-4 px-6 border border-stone-800"
         style={{ backgroundColor: '#111009' }}
       >
         <div
@@ -237,7 +237,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
           className="transition-all duration-300"
           style={{
             fontFamily: FONT_TITLE,
-            fontSize: '72px',
+            fontSize: '52px',
             color: scoreFlash ? '#d4a843' : '#c8b89a',
             textShadow: scoreFlash ? '0 0 24px rgba(212,168,67,0.6)' : 'none',
             lineHeight: 1,
