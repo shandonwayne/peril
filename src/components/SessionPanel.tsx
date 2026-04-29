@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, Copy, Check, Zap } from 'lucide-react';
+import { Users, Copy, Check, Zap, X } from 'lucide-react';
 import { supabase, Player } from '../lib/supabase';
 import { PixelAvatar } from './PixelAvatars';
 
@@ -12,9 +12,10 @@ interface SessionPanelProps {
   onPlayersChange: (players: Player[]) => void;
   buzzedPlayerId?: string | null;
   onClearBuzz?: () => void;
+  isEditMode?: boolean;
 }
 
-export function SessionPanel({ joinCode, sessionId, players, onPlayersChange, buzzedPlayerId, onClearBuzz }: SessionPanelProps) {
+export function SessionPanel({ joinCode, sessionId, players, onPlayersChange, buzzedPlayerId, onClearBuzz, isEditMode }: SessionPanelProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -48,6 +49,10 @@ export function SessionPanel({ joinCode, sessionId, players, onPlayersChange, bu
   }, [sessionId, onPlayersChange]);
 
   const buzzedPlayer = buzzedPlayerId ? players.find(p => p.id === buzzedPlayerId) : null;
+
+  const removePlayer = async (playerId: string) => {
+    await supabase.from('players').delete().eq('id', playerId);
+  };
 
   const copyCode = () => {
     navigator.clipboard.writeText(joinCode);
@@ -158,6 +163,15 @@ export function SessionPanel({ joinCode, sessionId, players, onPlayersChange, bu
               >
                 {p.score}
               </span>
+              {isEditMode && (
+                <button
+                  onClick={() => removePlayer(p.id)}
+                  className="text-stone-700 hover:text-red-700 transition-colors duration-150 ml-0.5"
+                  title={`Remove ${p.name}`}
+                >
+                  <X size={10} />
+                </button>
+              )}
             </div>
           ))}
         </div>

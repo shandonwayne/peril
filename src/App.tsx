@@ -183,10 +183,10 @@ function HostBoard() {
     }
     setQuestions(prev => prev.map(q => ({ ...q, is_answered: false })));
 
-    // Reset all player scores in the current session
+    // Remove all players from the current session
     if (session) {
-      await supabase.from('players').update({ score: 0 }).eq('session_id', session.id);
-      setPlayers(prev => prev.map(p => ({ ...p, score: 0 })));
+      await supabase.from('players').delete().eq('session_id', session.id);
+      setPlayers([]);
     }
   };
 
@@ -245,6 +245,7 @@ function HostBoard() {
           onPlayersChange={handlePlayersChange}
           buzzedPlayerId={buzzedPlayerId}
           onClearBuzz={() => setBuzzedPlayerId(null)}
+          isEditMode={isEditMode}
         />
       )}
 
