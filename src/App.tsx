@@ -315,8 +315,8 @@ function HostBoard() {
         )}
         {board?.board_code && (
           <span
-            className="text-stone-600 tracking-widest select-all"
-            style={{ fontFamily: "'Jacquard 12', serif", fontSize: '13px' }}
+            className="text-stone-600 select-all"
+            style={{ fontSize: '11px', letterSpacing: '0.05em' }}
             title="Board code — enter this in Load Board to reload this board"
           >
             board: {board.board_code}
