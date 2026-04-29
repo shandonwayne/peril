@@ -602,13 +602,6 @@ export function PlayerJoinPage() {
         className="w-full max-w-sm flex flex-col gap-6 p-8 border border-stone-800"
         style={{ backgroundColor: '#111009' }}
       >
-        <div
-          className="text-stone-400 tracking-widest text-center"
-          style={{ fontFamily: FONT_TITLE, fontSize: '22px' }}
-        >
-          Join Game
-        </div>
-
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <label
@@ -641,8 +634,8 @@ export function PlayerJoinPage() {
               onKeyDown={e => e.key === 'Enter' && handleJoin()}
               placeholder="Enter name"
               maxLength={20}
-              className="bg-transparent border border-stone-800 text-stone-300 px-3 py-2.5 focus:outline-none focus:border-stone-600 transition-colors"
-              style={{ fontFamily: FONT_BODY, fontSize: '16px' }}
+              className="bg-transparent border border-stone-800 text-stone-300 px-3 py-2.5 focus:outline-none focus:border-stone-600 transition-colors tracking-widest text-center"
+              style={{ fontFamily: FONT_BODY, fontSize: '22px' }}
             />
           </div>
 
