@@ -142,12 +142,12 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
   }, [sessionId, player.id]);
 
   const handleBuzz = async () => {
-    if (!buzzerActive || hasBuzzed || buzzing || !buzzerQuestionId) return;
+    if (hasBuzzed || buzzing) return;
     setBuzzing(true);
     const { error } = await supabase.from('buzzer_events').insert({
       session_id: sessionId,
       player_id: player.id,
-      question_id: buzzerQuestionId,
+      question_id: buzzerQuestionId ?? null,
       status: 'pending',
     });
     if (!error) {
@@ -159,7 +159,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
   const rank = allPlayers.findIndex(p => p.id === player.id) + 1;
   const suffix = rank === 1 ? 'st' : rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th';
 
-  const canBuzz = buzzerActive && !hasBuzzed;
+  const canBuzz = !hasBuzzed;
   const buzzerResultColor = buzzerResult === 'correct' ? '#6b8f5e' : buzzerResult === 'incorrect' ? '#8f3b3b' : null;
 
   return (
