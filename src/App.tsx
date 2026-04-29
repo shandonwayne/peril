@@ -293,15 +293,6 @@ function HostBoard() {
         )}
         {isEditMode && (
           <>
-            {board?.board_code && (
-              <span
-                className="text-stone-700 tracking-widest select-all"
-                style={{ fontFamily: "'Jacquard 12', serif", fontSize: '13px' }}
-                title="Board code — share this to reload the board later"
-              >
-                {board.board_code}
-              </span>
-            )}
             <button
               onClick={() => setShowBoardSwitcher(true)}
               className="flex items-center gap-1.5 text-stone-600 hover:text-stone-400 transition-colors duration-200 cursor-pointer bg-transparent border-none outline-none"
@@ -321,6 +312,15 @@ function HostBoard() {
               <span>clear board</span>
             </button>
           </>
+        )}
+        {board?.board_code && (
+          <span
+            className="text-stone-600 tracking-widest select-all"
+            style={{ fontFamily: "'Jacquard 12', serif", fontSize: '13px' }}
+            title="Board code — enter this in Load Board to reload this board"
+          >
+            board: {board.board_code}
+          </span>
         )}
         <ModeToggle isEditMode={isEditMode} onToggle={() => setIsEditMode(e => !e)} />
       </div>
