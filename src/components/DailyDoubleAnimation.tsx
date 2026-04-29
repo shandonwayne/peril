@@ -50,10 +50,10 @@ export function DailyDoubleAnimation({ onComplete }: DailyDoubleAnimationProps) 
           style={{
             fontFamily: "'Germania One', serif",
             fontSize: 'clamp(52px, 10vw, 96px)',
-            color: '#c97d28',
+            color: '#c93028',
             letterSpacing: '0.08em',
             lineHeight: 1,
-            textShadow: '0 0 40px rgba(201,125,40,0.5), 0 0 80px rgba(201,125,40,0.2)',
+            textShadow: '0 0 40px rgba(201,48,40,0.5), 0 0 80px rgba(201,48,40,0.2)',
           }}
         >
           DAILY
@@ -62,10 +62,10 @@ export function DailyDoubleAnimation({ onComplete }: DailyDoubleAnimationProps) 
           style={{
             fontFamily: "'Germania One', serif",
             fontSize: 'clamp(52px, 10vw, 96px)',
-            color: '#e8a84a',
+            color: '#e84a4a',
             letterSpacing: '0.08em',
             lineHeight: 1,
-            textShadow: '0 0 40px rgba(232,168,74,0.55), 0 0 80px rgba(232,168,74,0.25)',
+            textShadow: '0 0 40px rgba(232,74,74,0.55), 0 0 80px rgba(232,74,74,0.25)',
           }}
         >
           DOUBLE
@@ -75,20 +75,9 @@ export function DailyDoubleAnimation({ onComplete }: DailyDoubleAnimationProps) 
             marginTop: '8px',
             width: 'clamp(120px, 30vw, 280px)',
             height: '1px',
-            background: 'linear-gradient(90deg, transparent, rgba(201,125,40,0.6), transparent)',
+            background: 'linear-gradient(90deg, transparent, rgba(201,48,40,0.6), transparent)',
           }}
         />
-        <div
-          style={{
-            fontFamily: "'Germania One', serif",
-            fontSize: 'clamp(14px, 2.5vw, 22px)',
-            color: 'rgba(201,125,40,0.5)',
-            letterSpacing: '0.3em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Art placeholder
-        </div>
       </div>
 
       <ScanLines />
