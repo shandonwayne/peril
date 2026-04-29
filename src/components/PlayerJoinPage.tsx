@@ -129,6 +129,10 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
         const ev = payload.new as BuzzerEvent;
         if (ev.status === 'correct' || ev.status === 'incorrect') {
           setBuzzerResult(ev.status);
+          setTimeout(() => {
+            setBuzzerResult(null);
+            setHasBuzzed(false);
+          }, 2000);
         }
       })
       .subscribe();
@@ -152,6 +156,10 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
     });
     if (!error) {
       setHasBuzzed(true);
+      buzzerTimerRef.current = setTimeout(() => {
+        setHasBuzzed(false);
+        setBuzzerResult(null);
+      }, 5000);
     }
     setBuzzing(false);
   };
