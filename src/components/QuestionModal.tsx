@@ -25,12 +25,34 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
 
   // As soon as the question is shown, register it as the active question in the session.
   // Players will activate their buzzer 4s after seeing this question_id appear.
+  // Also poll for any buzzer events that may have arrived before our subscription connected.
   useEffect(() => {
     if (!animationDone || !sessionId) return;
     supabase
       .from('game_sessions')
       .update({ buzzer_question_id: question.id, buzzer_open: true })
       .eq('id', sessionId);
+
+    // Poll for existing buzzer events for this question in case we missed any
+    const poll = setInterval(async () => {
+      const { data } = await supabase
+        .from('buzzer_events')
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('question_id', question.id)
+        .order('buzzed_at', { ascending: true });
+      if (data && data.length > 0) {
+        setBuzzerEvents(prev => {
+          const merged = [...prev];
+          for (const ev of data) {
+            if (!merged.find(e => e.id === ev.id)) merged.push(ev);
+          }
+          return merged.sort((a, b) => a.buzzed_at.localeCompare(b.buzzed_at));
+        });
+      }
+    }, 1000);
+
+    return () => clearInterval(poll);
   }, [animationDone, question.id, sessionId]);
 
   // Subscribe to buzzer events for this question while modal is open
@@ -44,7 +66,8 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
         filter: `session_id=eq.${sessionId}`,
       }, (payload) => {
         const ev = payload.new as BuzzerEvent;
-        if (ev.question_id !== question.id) return;
+        // Accept events that match this question, or have no question_id set yet
+        if (ev.question_id !== null && ev.question_id !== question.id) return;
         setBuzzerEvents(prev => {
           if (prev.find(e => e.id === ev.id)) return prev;
           return [...prev, ev].sort((a, b) => a.buzzed_at.localeCompare(b.buzzed_at));
