@@ -33,6 +33,7 @@ function HostBoard() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<GameSession | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [buzzedPlayerId, setBuzzedPlayerId] = useState<string | null>(null);
 
   useEffect(() => {
     loadBoard();
@@ -112,6 +113,36 @@ function HostBoard() {
       attempts++;
     }
   };
+
+  useEffect(() => {
+    if (!session) return;
+    const channel = supabase
+      .channel(`host_buzzer_board_${session.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'buzzer_events',
+        filter: `session_id=eq.${session.id}`,
+      }, (payload) => {
+        const ev = payload.new as { player_id: string; status: string };
+        if (ev.status === 'pending') {
+          setBuzzedPlayerId(prev => prev ?? ev.player_id);
+        }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'buzzer_events',
+        filter: `session_id=eq.${session.id}`,
+      }, (payload) => {
+        const ev = payload.new as { player_id: string; status: string };
+        if (ev.status === 'correct' || ev.status === 'incorrect') {
+          setBuzzedPlayerId(null);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session]);
 
   const handleMarkAnswered = async (id: string) => {
     await supabase.from('questions').update({ is_answered: true }).eq('id', id);
@@ -195,6 +226,8 @@ function HostBoard() {
           sessionId={session.id}
           players={players}
           onPlayersChange={handlePlayersChange}
+          buzzedPlayerId={buzzedPlayerId}
+          onClearBuzz={() => setBuzzedPlayerId(null)}
         />
       )}
 
