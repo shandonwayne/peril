@@ -195,20 +195,20 @@ export function AvatarPicker({
   onChange: (id: number) => void;
 }) {
   return (
-    <div className="flex gap-3 justify-center flex-wrap">
+    <div className="grid grid-cols-3 gap-3">
       {AVATARS.map((av, i) => (
         <button
           key={i}
           type="button"
           onClick={() => onChange(i)}
           title={av.label}
-          className="flex flex-col items-center gap-1 p-2 border transition-all duration-150 focus:outline-none"
+          className="flex flex-col items-center gap-1.5 p-3 border transition-all duration-150 focus:outline-none"
           style={{
             borderColor: selected === i ? av.color : '#292524',
             backgroundColor: selected === i ? 'rgba(255,255,255,0.04)' : 'transparent',
           }}
         >
-          <PixelSprite pixels={av.pixels} color={av.color} size={36} />
+          <PixelSprite pixels={av.pixels} color={av.color} size={48} />
           <span
             className="tracking-widest uppercase"
             style={{ fontFamily: "'Germania One', serif", fontSize: '9px', color: selected === i ? av.color : '#57534e' }}
