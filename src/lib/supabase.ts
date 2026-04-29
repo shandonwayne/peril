@@ -56,6 +56,7 @@ export interface Player {
   session_id: string;
   name: string;
   score: number;
+  avatar_id: number;
   device_token: string;
   created_at: string;
 }

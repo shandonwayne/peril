@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase, Player, GameSession, BuzzerEvent, generateDeviceToken } from '../lib/supabase';
 import PerilLogo from '../assets/perillogo.svg';
+import { PixelAvatar, AvatarPicker } from './PixelAvatars';
 
 const FONT_TITLE = "'Jacquard 12', serif";
 const FONT_BODY = "'Germania One', serif";
@@ -226,6 +227,8 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
         className="w-full max-w-sm flex flex-col items-center gap-1 py-4 px-6 border border-stone-800"
         style={{ backgroundColor: '#111009' }}
       >
+        <PixelAvatar id={player.avatar_id ?? 0} size={48} />
+
         <div
           className="text-stone-400 tracking-widest uppercase"
           style={{ fontFamily: FONT_BODY, fontSize: '14px' }}
@@ -419,10 +422,13 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
   );
 }
 
+const AVATAR_KEY = 'peril_avatar_id';
+
 export function PlayerJoinPage() {
   const [phase, setPhase] = useState<Phase>('join');
   const [codeInput, setCodeInput] = useState('');
   const [nameInput, setNameInput] = useState('');
+  const [avatarId, setAvatarId] = useState(0);
   const [storedCode, setStoredCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -469,6 +475,9 @@ export function PlayerJoinPage() {
           }
         }
       }
+
+      const savedAvatar = parseInt(localStorage.getItem(AVATAR_KEY) ?? '0', 10);
+      setAvatarId(isNaN(savedAvatar) ? 0 : savedAvatar);
 
       if (savedCode) setCodeInput(savedCode);
       if (resolvedName) setNameInput(resolvedName);
@@ -538,7 +547,7 @@ export function PlayerJoinPage() {
     const deviceToken = generateDeviceToken();
     const { data: player, error: insertErr } = await supabase
       .from('players')
-      .insert({ session_id: session.id, name, device_token: deviceToken, score: 0 })
+      .insert({ session_id: session.id, name, device_token: deviceToken, score: 0, avatar_id: avatarId })
       .select()
       .single() as { data: Player | null; error: unknown };
 
@@ -553,6 +562,7 @@ export function PlayerJoinPage() {
     localStorage.setItem(SESSION_ID_KEY, session.id);
     localStorage.setItem(GAME_CODE_KEY, code);
     localStorage.setItem(PLAYER_NAME_KEY, name);
+    localStorage.setItem(AVATAR_KEY, String(avatarId));
     setStoredCode(code);
 
     setJoinedPlayer(player);
@@ -622,6 +632,16 @@ export function PlayerJoinPage() {
               className="bg-transparent border border-stone-800 text-stone-300 px-3 py-2.5 focus:outline-none focus:border-stone-600 transition-colors"
               style={{ fontFamily: FONT_BODY, fontSize: '16px' }}
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label
+              className="text-stone-600 tracking-widest uppercase"
+              style={{ fontFamily: FONT_BODY, fontSize: '11px' }}
+            >
+              Choose Avatar
+            </label>
+            <AvatarPicker selected={avatarId} onChange={id => { setAvatarId(id); localStorage.setItem(AVATAR_KEY, String(id)); }} />
           </div>
         </div>
 

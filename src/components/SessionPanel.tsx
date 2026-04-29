@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Users, Copy, Check, Zap } from 'lucide-react';
 import { supabase, Player } from '../lib/supabase';
+import { PixelAvatar } from './PixelAvatars';
 
 const FONT = "'Germania One', serif";
 
@@ -135,9 +136,10 @@ export function SessionPanel({ joinCode, sessionId, players, onPlayersChange, bu
           {[...players].sort((a, b) => b.score - a.score).map((p, i) => (
             <div
               key={p.id}
-              className="flex items-center gap-2 px-3 py-1.5 border border-stone-800"
+              className="flex items-center gap-2 px-2 py-1.5 border border-stone-800"
               style={{ backgroundColor: '#111009' }}
             >
+              <PixelAvatar id={p.avatar_id ?? 0} size={22} />
               <span
                 style={{
                   fontFamily: FONT,
