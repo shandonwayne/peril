@@ -39,6 +39,8 @@ export interface GameSession {
   is_active: boolean;
   buzzer_open: boolean;
   buzzer_question_id: string | null;
+  daily_double_player_id: string | null;
+  daily_double_wager: number | null;
   created_at: string;
 }
 

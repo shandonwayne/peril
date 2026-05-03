@@ -6,7 +6,7 @@ const FONT = "'Germania One', serif";
 const POINT_VALUES = [200, 400, 600, 800, 1000];
 
 interface BoardSwitcherModalProps {
-  onClose: () => void;
+  onClose?: () => void;
   onBoardLoaded: (boardId: string) => void;
 }
 
@@ -89,14 +89,14 @@ export function BoardSwitcherModal({ onClose, onBoardLoaded }: BoardSwitcherModa
 
     setWorking(false);
     onBoardLoaded(board.id);
-    onClose();
+    onClose?.();
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
     >
       <div
         className="relative w-full max-w-md border border-stone-800"
@@ -107,12 +107,14 @@ export function BoardSwitcherModal({ onClose, onBoardLoaded }: BoardSwitcherModa
           <span style={{ fontFamily: FONT, fontSize: '22px', color: '#e8d5a8', letterSpacing: '0.05em' }}>
             Board
           </span>
-          <button
-            onClick={onClose}
-            className="text-stone-600 hover:text-stone-400 transition-colors"
-          >
-            <X size={18} />
-          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-stone-600 hover:text-stone-400 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         {/* Tabs */}

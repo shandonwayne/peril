@@ -32,6 +32,11 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
   const [buzzerResult, setBuzzerResult] = useState<'correct' | 'incorrect' | null>(null);
   const [buzzing, setBuzzing] = useState(false);
   const buzzerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Daily double wager state
+  const [isDailyDoubleWager, setIsDailyDoubleWager] = useState(false);
+  const [wagerInput, setWagerInput] = useState('');
+  const [wagerSubmitted, setWagerSubmitted] = useState(false);
+  const [wagerError, setWagerError] = useState('');
 
   useEffect(() => {
     const loadPlayers = async () => {
@@ -104,7 +109,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
       })
       .subscribe();
 
-    // Subscribe to session buzzer_question_id changes
+    // Subscribe to session updates (buzzer_question_id + daily double)
     const sessionChannel = supabase
       .channel(`session_buzzer_${sessionId}`)
       .on('postgres_changes', {
@@ -115,6 +120,21 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
       }, (payload) => {
         const updated = payload.new as GameSession;
         const newQid = updated.buzzer_question_id ?? null;
+
+        // Daily double wager prompt
+        const isMyDailyDouble = updated.daily_double_player_id === player.id;
+        if (updated.daily_double_player_id !== null) {
+          setIsDailyDoubleWager(isMyDailyDouble);
+          if (isMyDailyDouble) {
+            setWagerInput('');
+            setWagerSubmitted(false);
+            setWagerError('');
+          }
+        } else {
+          setIsDailyDoubleWager(false);
+          setWagerSubmitted(false);
+        }
+
         setBuzzerQuestionId(prev => {
           if (prev !== newQid) {
             // New question — reset buzzer state
@@ -124,8 +144,8 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
             setWasFirst(null);
             if (buzzerTimerRef.current) clearTimeout(buzzerTimerRef.current);
 
-            if (newQid) {
-              // Activate buzzer after 4 seconds
+            if (newQid && !isMyDailyDouble) {
+              // Activate buzzer after 4 seconds (not for daily double player — they wager instead)
               buzzerTimerRef.current = setTimeout(() => setBuzzerActive(true), 4000);
             }
           }
@@ -220,6 +240,16 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
     setBuzzing(false);
   };
 
+  const handleWagerSubmit = async () => {
+    const raw = parseInt(wagerInput.trim(), 10);
+    const maxWager = Math.max(player.score, 1000); // minimum floor of 1000 per Jeopardy rules
+    if (isNaN(raw) || raw < 5) { setWagerError('Minimum wager is 5'); return; }
+    if (raw > maxWager) { setWagerError(`Maximum wager is ${maxWager}`); return; }
+    setWagerError('');
+    await supabase.from('game_sessions').update({ daily_double_wager: raw }).eq('id', sessionId);
+    setWagerSubmitted(true);
+  };
+
   const rank = allPlayers.findIndex(p => p.id === player.id) + 1;
   const suffix = rank === 1 ? 'st' : rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th';
 
@@ -270,6 +300,53 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
           </div>
         )}
       </div>
+
+      {/* Daily Double wager UI */}
+      {isDailyDoubleWager && (
+        <div
+          className="w-full max-w-sm flex flex-col items-center gap-4 p-6 border"
+          style={{ borderColor: 'rgba(201,125,40,0.5)', backgroundColor: 'rgba(201,125,40,0.04)' }}
+        >
+          <div style={{ fontFamily: FONT_BODY, fontSize: '22px', color: '#c97d28', letterSpacing: '0.06em' }}>
+            Daily Double!
+          </div>
+          <div style={{ fontFamily: FONT_BODY, fontSize: '13px', color: '#78716c', textAlign: 'center' }}>
+            You are in control. Enter your wager.<br />
+            Max: {Math.max(player.score, 1000).toLocaleString()} pts
+          </div>
+
+          {!wagerSubmitted ? (
+            <>
+              <input
+                type="number"
+                min={5}
+                max={Math.max(player.score, 1000)}
+                value={wagerInput}
+                onChange={e => { setWagerInput(e.target.value); setWagerError(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleWagerSubmit()}
+                placeholder="0"
+                className="w-full bg-transparent border border-stone-700 focus:border-amber-700 focus:outline-none px-4 py-3 text-center tracking-widest"
+                style={{ fontFamily: FONT_BODY, fontSize: '32px', color: '#e8d5a8' }}
+              />
+              {wagerError && (
+                <p style={{ fontFamily: FONT_BODY, fontSize: '12px', color: '#8f3b3b' }}>{wagerError}</p>
+              )}
+              <button
+                onClick={handleWagerSubmit}
+                disabled={!wagerInput.trim()}
+                className="w-full py-3 border border-amber-800 text-amber-600 hover:text-amber-300 hover:border-amber-500 transition-all duration-200 tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ fontFamily: FONT_BODY, fontSize: '16px' }}
+              >
+                Lock In Wager
+              </button>
+            </>
+          ) : (
+            <div style={{ fontFamily: FONT_BODY, fontSize: '18px', color: '#c97d28' }}>
+              Wagered {parseInt(wagerInput, 10).toLocaleString()} — good luck!
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Buzzer section */}
       <div className="w-full max-w-sm flex flex-col items-center gap-3">
