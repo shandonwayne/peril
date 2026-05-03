@@ -54,11 +54,20 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
     const loadSession = async () => {
       const { data } = await supabase
         .from('game_sessions')
-        .select('buzzer_question_id')
+        .select('buzzer_question_id, daily_double_player_id')
         .eq('id', sessionId)
-        .maybeSingle();
+        .maybeSingle() as { data: Pick<GameSession, 'buzzer_question_id' | 'daily_double_player_id'> | null };
       if (data?.buzzer_question_id) {
         setBuzzerQuestionId(data.buzzer_question_id);
+      }
+      if (data?.daily_double_player_id != null) {
+        const isMyDailyDouble = data.daily_double_player_id === player.id;
+        setIsDailyDoubleWager(isMyDailyDouble);
+        if (isMyDailyDouble) {
+          setWagerInput('');
+          setWagerSubmitted(false);
+          setWagerError('');
+        }
       }
     };
 
@@ -210,12 +219,37 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
       })
       .subscribe();
 
+    // Poll for daily_double_player_id in case realtime misses the update
+    const ddPoll = setInterval(async () => {
+      const { data } = await supabase
+        .from('game_sessions')
+        .select('daily_double_player_id')
+        .eq('id', sessionId)
+        .maybeSingle() as { data: Pick<GameSession, 'daily_double_player_id'> | null };
+      if (!data) return;
+      const isMyDailyDouble = data.daily_double_player_id === player.id;
+      setIsDailyDoubleWager(prev => {
+        if (data.daily_double_player_id === null) {
+          if (prev) setWagerSubmitted(false);
+          return false;
+        }
+        if (!prev && isMyDailyDouble) {
+          // Freshly assigned — reset wager form
+          setWagerInput('');
+          setWagerSubmitted(false);
+          setWagerError('');
+        }
+        return isMyDailyDouble;
+      });
+    }, 1500);
+
     return () => {
       supabase.removeChannel(playerChannel);
       supabase.removeChannel(sessionChannel);
       supabase.removeChannel(buzzerEventChannel);
       supabase.removeChannel(allBuzzesChannel);
       if (buzzerTimerRef.current) clearTimeout(buzzerTimerRef.current);
+      clearInterval(ddPoll);
     };
   }, [sessionId, player.id]);
 
