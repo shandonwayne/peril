@@ -35,14 +35,38 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
   useEffect(() => {
     if (!animationDone || !sessionId) return;
 
-    const update: Record<string, unknown> = { buzzer_question_id: question.id, buzzer_open: !question.is_daily_double };
+    const run = async () => {
+      let wagerId: string | null = null;
 
-    if (question.is_daily_double && wagerPlayer) {
-      update.daily_double_player_id = wagerPlayer.id;
-      update.daily_double_wager = null;
-    }
+      if (question.is_daily_double) {
+        // Try prop players first, fall back to a fresh DB fetch
+        let topPlayer = wagerPlayer;
+        if (!topPlayer) {
+          const { data } = await supabase
+            .from('players')
+            .select('id, score')
+            .eq('session_id', sessionId)
+            .order('score', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (data) topPlayer = data as Player;
+        }
+        wagerId = topPlayer?.id ?? null;
+      }
 
-    supabase.from('game_sessions').update(update).eq('id', sessionId);
+      const update: Record<string, unknown> = {
+        buzzer_question_id: question.id,
+        buzzer_open: !question.is_daily_double,
+      };
+      if (question.is_daily_double) {
+        update.daily_double_player_id = wagerId;
+        update.daily_double_wager = null;
+      }
+
+      await supabase.from('game_sessions').update(update).eq('id', sessionId);
+    };
+
+    run();
 
     if (!question.is_daily_double) {
       // Poll for buzzer events
@@ -79,7 +103,8 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
       }, 800);
       return () => { if (wagerPollRef.current) clearInterval(wagerPollRef.current); };
     }
-  }, [animationDone, question.id, question.is_daily_double, sessionId, wagerPlayer]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animationDone, question.id, question.is_daily_double, sessionId]);
 
   // Subscribe to buzzer events (only for non-daily-double)
   useEffect(() => {
