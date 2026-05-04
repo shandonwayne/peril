@@ -34,6 +34,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
   const buzzerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Daily double wager state
   const [isDailyDoubleWager, setIsDailyDoubleWager] = useState(false);
+  const [ddMaxWager, setDdMaxWager] = useState<number>(1000);
   const [wagerInput, setWagerInput] = useState('');
   const [wagerSubmitted, setWagerSubmitted] = useState(false);
   const [wagerError, setWagerError] = useState('');
@@ -54,9 +55,9 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
     const loadSession = async () => {
       const { data } = await supabase
         .from('game_sessions')
-        .select('buzzer_question_id, daily_double_player_id')
+        .select('buzzer_question_id, daily_double_player_id, daily_double_max_wager')
         .eq('id', sessionId)
-        .maybeSingle() as { data: Pick<GameSession, 'buzzer_question_id' | 'daily_double_player_id'> | null };
+        .maybeSingle() as { data: Pick<GameSession, 'buzzer_question_id' | 'daily_double_player_id' | 'daily_double_max_wager'> | null };
       if (data?.buzzer_question_id) {
         setBuzzerQuestionId(data.buzzer_question_id);
       }
@@ -64,6 +65,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
         const isMyDailyDouble = data.daily_double_player_id === player.id;
         setIsDailyDoubleWager(isMyDailyDouble);
         if (isMyDailyDouble) {
+          setDdMaxWager(data.daily_double_max_wager ?? 1000);
           setWagerInput('');
           setWagerSubmitted(false);
           setWagerError('');
@@ -135,6 +137,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
         if (updated.daily_double_player_id !== null) {
           setIsDailyDoubleWager(isMyDailyDouble);
           if (isMyDailyDouble) {
+            setDdMaxWager(updated.daily_double_max_wager ?? 1000);
             setWagerInput('');
             setWagerSubmitted(false);
             setWagerError('');
@@ -223,9 +226,9 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
     const ddPoll = setInterval(async () => {
       const { data } = await supabase
         .from('game_sessions')
-        .select('daily_double_player_id')
+        .select('daily_double_player_id, daily_double_max_wager')
         .eq('id', sessionId)
-        .maybeSingle() as { data: Pick<GameSession, 'daily_double_player_id'> | null };
+        .maybeSingle() as { data: Pick<GameSession, 'daily_double_player_id' | 'daily_double_max_wager'> | null };
       if (!data) return;
       const isMyDailyDouble = data.daily_double_player_id === player.id;
       setIsDailyDoubleWager(prev => {
@@ -234,7 +237,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
           return false;
         }
         if (!prev && isMyDailyDouble) {
-          // Freshly assigned — reset wager form
+          setDdMaxWager(data.daily_double_max_wager ?? 1000);
           setWagerInput('');
           setWagerSubmitted(false);
           setWagerError('');
@@ -276,9 +279,8 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
 
   const handleWagerSubmit = async () => {
     const raw = parseInt(wagerInput.trim(), 10);
-    const maxWager = Math.max(player.score, 1000); // minimum floor of 1000 per Jeopardy rules
     if (isNaN(raw) || raw < 5) { setWagerError('Minimum wager is 5'); return; }
-    if (raw > maxWager) { setWagerError(`Maximum wager is ${maxWager}`); return; }
+    if (raw > ddMaxWager) { setWagerError(`Maximum wager is ${ddMaxWager}`); return; }
     setWagerError('');
     await supabase.from('game_sessions').update({ daily_double_wager: raw }).eq('id', sessionId);
     setWagerSubmitted(true);
@@ -346,7 +348,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
           </div>
           <div style={{ fontFamily: FONT_BODY, fontSize: '13px', color: '#78716c', textAlign: 'center' }}>
             You are in control. Enter your wager.<br />
-            Max: {Math.max(player.score, 1000).toLocaleString()} pts
+            Max: {ddMaxWager.toLocaleString()} pts
           </div>
 
           {!wagerSubmitted ? (
@@ -354,7 +356,7 @@ function PlayerTracker({ player: initialPlayer, sessionId }: PlayerTrackerProps)
               <input
                 type="number"
                 min={5}
-                max={Math.max(player.score, 1000)}
+                max={ddMaxWager}
                 value={wagerInput}
                 onChange={e => { setWagerInput(e.target.value); setWagerError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleWagerSubmit()}

@@ -41,6 +41,7 @@ export interface GameSession {
   buzzer_question_id: string | null;
   daily_double_player_id: string | null;
   daily_double_wager: number | null;
+  daily_double_max_wager: number | null;
   created_at: string;
 }
 

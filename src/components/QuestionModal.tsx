@@ -61,6 +61,7 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
       if (question.is_daily_double) {
         update.daily_double_player_id = wagerId;
         update.daily_double_wager = null;
+        update.daily_double_max_wager = question.point_value * 2;
       }
 
       await supabase.from('game_sessions').update(update).eq('id', sessionId);
@@ -166,7 +167,7 @@ export function QuestionModal({ question, categoryName, sessionId, onClose, onMa
   const clearBuzzer = async () => {
     await supabase
       .from('game_sessions')
-      .update({ buzzer_open: false, buzzer_question_id: null, daily_double_player_id: null, daily_double_wager: null })
+      .update({ buzzer_open: false, buzzer_question_id: null, daily_double_player_id: null, daily_double_wager: null, daily_double_max_wager: null })
       .eq('id', sessionId);
   };
 
